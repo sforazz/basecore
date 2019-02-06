@@ -4,7 +4,7 @@ class BaseConverter(object):
     
     def __init__(self, toConvert, clean=False):
         
-        self.basedir, self.filename, _ = split_filename(self.toConvert)
+        self.basedir, self.filename, _ = split_filename(toConvert)
         self.toConvert = toConvert
         self.clean = clean
     

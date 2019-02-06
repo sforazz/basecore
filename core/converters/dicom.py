@@ -6,7 +6,7 @@ import glob
 
 class DicomConverter(BaseConverter):
     
-    def convert(self, convert_to='nifti', method='dcm2niix'):
+    def convert(self, convert_to='nifti_gz', method='dcm2niix'):
 
         if convert_to == 'nrrd':
 
@@ -24,7 +24,8 @@ class DicomConverter(BaseConverter):
                 raise Exception('Not recognized {} method to convert from DICOM to NRRD.'.format(method))
 
         elif convert_to == 'nifti_gz':
-
+            
+            ext = '.nii.gz'
             if method == 'dcm2niix':
                 cmd = ("dcm2niix -o {0} -f {1} -z y {2}".format(self.basedir, self.filename,
                                                                 self.toConvert))
@@ -33,6 +34,7 @@ class DicomConverter(BaseConverter):
 
         elif convert_to == 'nifti':
 
+            ext = '.nii'
             if method == 'dcm2niix':
                 cmd = ("dcm2niix -o {0} -f {1} {2}".format(self.basedir, self.filename, self.toConvert))
             else:
@@ -44,7 +46,9 @@ class DicomConverter(BaseConverter):
         sp.check_output(cmd, shell=True)
 
         if self.clean:
-            self.clean_dir
+            self.clean_dir()
+
+        return os.path.join(self.basedir, self.filename)+ext
 
     def clean_dir(self):
 
