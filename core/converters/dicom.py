@@ -19,7 +19,7 @@ class DicomConverter(BaseConverter):
                     .format(self.toConvert, os.path.join(self.basedir, self.filename)+ext))
 
             elif method=='mitk':
-                cmd = ("MitkCLDicom2Nrrd -i '{0}' -o '{1}'".format(self.toConvert,
+                cmd = ("MitkCLDicom2Nrrd.sh -i '{0}' -o '{1}'".format(self.toConvert,
                                                                    os.path.join(self.basedir, self.filename)+ext))
 
             else:
