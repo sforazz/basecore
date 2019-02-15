@@ -9,6 +9,8 @@ class DicomConverter(BaseConverter):
     def convert(self, convert_to='nifti_gz', method='dcm2niix'):
 
         if convert_to == 'nrrd':
+            if method=='dcm2niix':
+                method = 'mitk'
 
             ext = '.nrrd'
             if method=='slicer':
