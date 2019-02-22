@@ -1,8 +1,70 @@
 import pydicom
 import numpy as np
 from operator import itemgetter
+import collections
 
 
+class DicomInfo(object):
+    
+    def __init__(self, folder):
+
+        dcms = list(folder.glob('*.dcm'))
+        if not dcms:
+            dcms = list(folder.glob('*.IMA'))
+        if not dcms:
+            raise Exception('No DICOM files found in {}'.format(folder))
+        else:
+            self.dcms = dcms
+
+    def get_tag(self, tag):
+        
+        tags = {}
+        toRemove = []
+        instance_nums = None
+
+        if type(tag) is not list:
+            tag = [tag]
+        for t in tag:
+            values = []
+            for dcm in self.dcms:
+                header = pydicom.read_file(str(dcm))
+                try:
+                    val = header.data_element(t).value
+                    if isinstance(val, collections.Iterable):
+                        val = tuple(val)
+                    else:
+                        val = str(val)
+                    values.append(val)
+                except AttributeError:
+                    print ('{} seems to do not have the right DICOM fields and '
+                           'will be removed from the folder'.format(dcm))
+                    toRemove.append(dcm)
+
+            if t == 'InstanceNumber':
+                instance_nums = values
+            tags[t] = list(set(values))
+
+        try:
+            toRemove+self.check_uniqueness(instance_nums, tags['SeriesNumber'])
+        except:
+            pass
+
+        if toRemove:
+            for f in toRemove:
+                self.dcms.remove(f)
+        
+        return self.dcms, tags
+
+    def check_uniqueness(self, InstanceNums, SeriesNums):
+        
+        toRemove = []
+        if (len(InstanceNums) == 2*(len(set(InstanceNums)))) and len(set(SeriesNums)) == 1:
+            sortedInstanceNums = sorted(zip(self.dcms, InstanceNums), key=itemgetter(1))
+            uniqueInstanceNums = [x[0] for x in sortedInstanceNums[:][0:-1:2]]
+            toRemove = toRemove+uniqueInstanceNums
+        
+        return toRemove
+        
 def dcm_info(dcm_folder):
     """Function to extract information from a list of DICOM files in one folder. It returns a list of
     unique image types and scan numbers found in the input list of DICOMS.

@@ -8,7 +8,7 @@ import os
 class NrrdConverter(BaseConverter):
 
     def convert(self, outname=None):
-
+        print('\nConversion from NRRD to NIFTI_GZ')
         if os.path.isdir(self.toConvert):
             raise Exception('Only .nrrd files can be converted into NIFTI. Got directory!')
 
@@ -18,3 +18,4 @@ class NrrdConverter(BaseConverter):
             nib.save(tosave, outname)
         else:
             nib.save(tosave, os.path.join(self.basedir, self.filename)+'.nii.gz')
+        print('\nImage successfully converted!')

@@ -9,6 +9,7 @@ class DicomConverter(BaseConverter):
     def convert(self, convert_to='nifti_gz', method='dcm2niix'):
 
         if convert_to == 'nrrd':
+            print('\nConversion from DICOM to NRRD...')
             if method=='dcm2niix':
                 method = 'mitk'
 
@@ -19,14 +20,14 @@ class DicomConverter(BaseConverter):
                     .format(self.toConvert, os.path.join(self.basedir, self.filename)+ext))
 
             elif method=='mitk':
-                cmd = ("MitkCLDicom2Nrrd.sh -i '{0}' -o '{1}'".format(self.toConvert,
+                cmd = ("MitkCLDicom2Nrrd -i '{0}' -o '{1}'".format(self.toConvert,
                                                                    os.path.join(self.basedir, self.filename)+ext))
 
             else:
                 raise Exception('Not recognized {} method to convert from DICOM to NRRD.'.format(method))
 
         elif convert_to == 'nifti_gz':
-            
+            print('\nConversion from DICOM to NIFTI_GZ...')
             ext = '.nii.gz'
             if method == 'dcm2niix':
                 cmd = ("dcm2niix -o {0} -f {1} -z y {2}".format(self.basedir, self.filename,
@@ -35,7 +36,7 @@ class DicomConverter(BaseConverter):
                 raise Exception('Not recognized {} method to convert from DICOM to NIFTI_GZ.'.format(method))
 
         elif convert_to == 'nifti':
-
+            print('\nConversion from DICOM to NIFTI...')
             ext = '.nii'
             if method == 'dcm2niix':
                 cmd = ("dcm2niix -o {0} -f {1} {2}".format(self.basedir, self.filename, self.toConvert))
@@ -49,7 +50,7 @@ class DicomConverter(BaseConverter):
 
         if self.clean:
             self.clean_dir()
-
+        print('\nImage successfully converted!')
         return os.path.join(self.basedir, self.filename)+ext
 
     def clean_dir(self):

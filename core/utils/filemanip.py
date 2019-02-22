@@ -69,7 +69,11 @@ def batch_processing(input_data, key_col1='subjects', key_col2='masks', root='')
         elif ext == '.csv':
             files = pd.read_csv(input_data)
         files=files.dropna()
-        masks = [os.path.join(root, str(x)) for x in list(files[key_col2])]
+        try:
+            masks = [os.path.join(root, str(x)) for x in list(files[key_col2])]
+        except KeyError:
+            print('No "masks" column found in the excel sheet. The cropping, if selected, will be performed without it.')
+            masks = None
         raw_data = [os.path.join(root, str(x)) for x in list(files[key_col1])] 
 
         return raw_data, masks

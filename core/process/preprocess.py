@@ -5,12 +5,18 @@ import os
 import shutil
 import glob
 import pydicom
+from core.utils.dicom import DicomInfo
+from pathlib import Path
 
 
 ALLOWED_EXT = ['.xlsx', '.csv']
 ILLEGAL_CHARACTERS = ['/', '(', ')', '[', ']', '{', '}', ' ', '-']
 
-
+# 
+# class DicomPrerocess(object):
+#     
+#     def __init__(self, raw_data, temp_dir):
+    
 def mouse_lung_data_preparation(raw_data, temp_dir):
     """Function to arrange the mouse lung data into a proper struture.
     In particular, this function will look into each raw_data folder searching for
@@ -41,12 +47,15 @@ def mouse_lung_data_preparation(raw_data, temp_dir):
     if not os.path.isdir(temp_dir):
         os.mkdir(temp_dir)
     basename = raw_data.split('/')[-1]
-    sequence_numbers = list(set([pydicom.read_file(x).SeriesNumber for x in dicoms]))
+#     dcm = DicomInfo(Path(raw_data))
+#     _, sequence_numbers = dcm.get_tag('SeriesNumber')
+#     _, tag = dcm.get_tag(['SeriesNumber', 'InstanceNumber', 'ImageType'])
+    sequence_numbers = list(set([str(pydicom.read_file(x).SeriesNumber) for x in dicoms]))
     for character in ILLEGAL_CHARACTERS:
         basename = basename.replace(character, '_')
     data_folders = []  # I will use this to store the sequence number of the CT data to convert
     for n_seq in sequence_numbers:                     
-        dicom_vols = [x for x in dicoms if n_seq==pydicom.read_file(x).SeriesNumber]
+        dicom_vols = [x for x in dicoms if n_seq==str(pydicom.read_file(x).SeriesNumber)]
         dcm_hd = pydicom.read_file(dicom_vols[0])
         if len(dicom_vols) > 1 and '50s' in dcm_hd.SeriesDescription:
             folder_name = temp_dir+'/{0}_Sequence_{1}'.format(basename, n_seq)

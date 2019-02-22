@@ -51,7 +51,9 @@ class FeatureExtractionAction(CLIActionBase):
         name += "_"+str(artefactHelper.getArtefactProperty(self._segmentedMask,
                                                            artefactProps.ACTIONTAG))\
                 +"_#"+str(artefactHelper.getArtefactProperty(self._segmentedMask,
-                                                             artefactProps.TIMEPOINT))
+                                                             artefactProps.TIMEPOINT))\
+                +"_"+str(artefactHelper.getArtefactProperty(self._segmentedMask,
+                                                            artefactProps.OBJECTIVE))
         if self._resampling is not None:
             name += "_after_resampling_to_{}mm".format(self._resampling)
             
@@ -141,7 +143,7 @@ class FeatureExtractionBatchAction(BatchActionBase):
             
             for lm in linkedMasks:
                 if lm['timePoint'] == target['timePoint']:
-                    action = FeatureExtractionAction(target, segmentedMask=lm, features=features, resampling=resampling,
+                    action = FeatureExtractionAction(target, lm, features=features, resampling=resampling,
                                                      actionTag=self._actionTag, alwaysDo=self._alwaysDo,
                                                      session=self._session,
                                                      additionalActionProps=self._additionalActionProps,
