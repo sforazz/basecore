@@ -6,15 +6,18 @@ import collections
 
 class DicomInfo(object):
     
-    def __init__(self, folder):
+    def __init__(self, dicoms):
 
-        dcms = list(folder.glob('*.dcm'))
-        if not dcms:
-            dcms = list(folder.glob('*.IMA'))
-        if not dcms:
-            raise Exception('No DICOM files found in {}'.format(folder))
+        if type(dicoms) == list:
+            self.dcms = dicoms
         else:
-            self.dcms = dcms
+            dcms = list(dicoms.glob('*.dcm'))
+            if not dcms:
+                dcms = list(dicoms.glob('*.IMA'))
+            if not dcms:
+                raise Exception('No DICOM files found in {}'.format(dicoms))
+            else:
+                self.dcms = dcms
 
     def get_tag(self, tag):
         
@@ -30,7 +33,7 @@ class DicomInfo(object):
                 header = pydicom.read_file(str(dcm))
                 try:
                     val = header.data_element(t).value
-                    if isinstance(val, collections.Iterable):
+                    if isinstance(val, collections.Iterable) and type(val) is not str:
                         val = tuple(val)
                     else:
                         val = str(val)

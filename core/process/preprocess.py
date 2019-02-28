@@ -1,21 +1,15 @@
-import numpy as np
-import nrrd
-from core.utils.filemanip import split_filename
 import os
 import shutil
 import glob
 import pydicom
 from core.utils.dicom import DicomInfo
 from pathlib import Path
+import pickle
 
 
 ALLOWED_EXT = ['.xlsx', '.csv']
 ILLEGAL_CHARACTERS = ['/', '(', ')', '[', ']', '{', '}', ' ', '-']
 
-# 
-# class DicomPrerocess(object):
-#     
-#     def __init__(self, raw_data, temp_dir):
     
 def mouse_lung_data_preparation(raw_data, temp_dir):
     """Function to arrange the mouse lung data into a proper struture.
@@ -35,6 +29,7 @@ def mouse_lung_data_preparation(raw_data, temp_dir):
     
     dicoms = sorted(glob.glob(raw_data+'/*.IMA'))
     dcm_info = {}
+    processed = False
     if not dicoms:
         dicoms = sorted(glob.glob(raw_data+'/*.dcm'))
         if not dicoms:
@@ -47,18 +42,17 @@ def mouse_lung_data_preparation(raw_data, temp_dir):
     if not os.path.isdir(temp_dir):
         os.mkdir(temp_dir)
     basename = raw_data.split('/')[-1]
-#     dcm = DicomInfo(Path(raw_data))
-#     _, sequence_numbers = dcm.get_tag('SeriesNumber')
-#     _, tag = dcm.get_tag(['SeriesNumber', 'InstanceNumber', 'ImageType'])
     sequence_numbers = list(set([str(pydicom.read_file(x).SeriesNumber) for x in dicoms]))
     for character in ILLEGAL_CHARACTERS:
         basename = basename.replace(character, '_')
-    data_folders = []  # I will use this to store the sequence number of the CT data to convert
     for n_seq in sequence_numbers:                     
         dicom_vols = [x for x in dicoms if n_seq==str(pydicom.read_file(x).SeriesNumber)]
         dcm_hd = pydicom.read_file(dicom_vols[0])
-        if len(dicom_vols) > 1 and '50s' in dcm_hd.SeriesDescription:
-            folder_name = temp_dir+'/{0}_Sequence_{1}'.format(basename, n_seq)
+        if len(dicom_vols) > 1 and '50s' in dcm_hd.SeriesDescription and not processed:
+            dcm = DicomInfo(dicom_vols)
+            _, tag = dcm.get_tag(['AcquisitionDate', 'SeriesTime'])
+            folder_name = temp_dir+'/{0}_date_{1}_time_{2}'.format(basename, tag['AcquisitionDate'][0],
+                                                                   tag['SeriesTime'][0])
             slices = [pydicom.read_file(x).InstanceNumber for x in dicom_vols]
             if len(slices) != len(set(slices)):
                 print('Duplicate slices found in {} for H50s sequence. Please check. '
@@ -74,86 +68,12 @@ def mouse_lung_data_preparation(raw_data, temp_dir):
                     shutil.copy2(x, folder_name)
                 except:
                     continue
-            data_folders.append(folder_name)
-    if not data_folders:
+            filename = sorted(glob.glob(folder_name+'/*{}'.format(ext)))[0]
+            with open(folder_name+'/dcm_info.p', 'wb') as fp:
+                pickle.dump(tag, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            processed = True
+    if not processed:
         print('No suitable CT data with name containing "H50s" were found in {}'.format(raw_data))
         filename = None
-    elif len(data_folders) > 1:
-        print ('{0} datasets with name containing "H50s" were found in {1}. By default,'
-               ' only the first one ({2}) will be used. Please check if this is correct.'
-               .format(len(data_folders), raw_data, data_folders[0]))
-    else:
-        filename = sorted(glob.glob(data_folders[0]+'/*{}'.format(ext)))[0]
-        hd = pydicom.read_file(filename)
-        dcm_info['vox_x'] = hd.PixelSpacing[0]
-        dcm_info['vox_y'] = hd.PixelSpacing[1]
-        dcm_info['vox_z'] = hd.SliceThickness
 
     return filename, folder_name, dcm_info
-
-
-def cropping(image, mask, prefix=None, size=[86, 86, 86]):
-
-    print('\nStarting raw data and mask cropping...')
-    imagePath, imageFilename, imageExt = split_filename(image)
-    if prefix is None:
-        imageOutname = os.path.join(imagePath, imageFilename+'_cropped')+imageExt
-    else:
-        imageOutname = os.path.join(imagePath, prefix+'_cropped')+imageExt
-    
-    _, maskFilename, maskExt = split_filename(mask)
-    maskOutname = os.path.join(imagePath, maskFilename+'_cropped')+maskExt
-    
-    maskData, maskHD = nrrd.read(mask)
-    imageData, imageHD = nrrd.read(image)
-    
-    x, y, z = np.where(maskData==1)
-    x_size = np.max(x)-np.min(x)
-    y_size = np.max(y)-np.min(y)
-    z_size = np.max(z)-np.min(z)
-    maskMax = np.max(maskData)
-    maskMin = np.min(maskData)
-    if maskMax > 1 and maskMin < 0:
-        print('This image {} is probably not a mask, as it is not binary. '
-              'It will be ignored. Please check if it is true.'.format(mask))
-        imageOutname = None
-        maskOutname = None
-    else:
-        if size:
-            offset_x = (size[0]-x_size)/2
-            offset_y = (size[1]-y_size)/2
-            offset_z = (size[2]-z_size)/2
-            if offset_x < 0 or offset_y < 0 or offset_z < 0:
-                raise Exception('Size too small, please increase.')
-    
-            if offset_x.is_integer():
-                new_x = [np.min(x)-offset_x, np.max(x)+offset_x]
-            else:
-                new_x = [np.min(x)-(offset_x-0.5), np.max(x)+(offset_x+0.5)]
-            if offset_y.is_integer():
-                new_y = [np.min(y)-offset_y, np.max(y)+offset_y]
-            else:
-                new_y = [np.min(y)-(offset_y-0.5), np.max(y)+(offset_y+0.5)]
-            if offset_z.is_integer():
-                new_z = [np.min(z)-offset_z, np.max(z)+offset_z]
-            else:
-                new_z = [np.min(z)-(offset_z-0.5), np.max(z)+(offset_z+0.5)]
-            new_x = [int(x) for x in new_x]
-            new_y = [int(x) for x in new_y]
-            new_z = [int(x) for x in new_z]
-        else:
-            new_x = [np.min(x)-20, np.max(x)+20]
-            new_y = [np.min(y)-20, np.max(y)+20]
-            new_z = [np.min(z)-20, np.max(z)+20]
-        croppedMask = maskData[new_x[0]:new_x[1], new_y[0]:new_y[1],
-                               new_z[0]:new_z[1]]
-        maskHD['sizes'] = np.array(croppedMask.shape)
-        
-        croppedImage = imageData[new_x[0]:new_x[1], new_y[0]:new_y[1],
-                                 new_z[0]:new_z[1]]
-        imageHD['sizes'] = np.array(croppedImage.shape)
-        
-        nrrd.write(imageOutname, croppedImage, header=imageHD)
-        nrrd.write(maskOutname, croppedMask, header=maskHD)
-    print('Cropping done!\n')
-    return imageOutname, maskOutname
