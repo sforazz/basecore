@@ -2,6 +2,7 @@ import os
 import nrrd
 import numpy as np
 from core.utils.filemanip import split_filename
+import pickle
 
 
 class ImageCropping():
@@ -92,35 +93,67 @@ class ImageCropping():
         deltaZ = int(np.ceil((dimZ-86)/2))
         mean_Z = int(np.ceil((dimZ)/2))
 
-        im = im[:, :200, :]
         im[im<-200] = -1024
-        x, y= np.where(im[:,:,mean_Z]!=-1024)
-        indY = np.max(y)
+
+        _, y1 = np.where(im[:, :, mean_Z]!=-1024)
+        im = im[:, np.min(y1)-10:np.min(y1)+100, :]
+        x, y = np.where(im[:, :, mean_Z]!=-1024)
+        indY = np.max(y) + np.min(y1)
         uniq = list(set(x))
         xx = [uniq[0]]
         for i in range(1, len(uniq)): 
             if uniq[i]!=uniq[i-1]+1:
                 xx.append(uniq[i-1])
                 xx.append(uniq[i])
-                print(i)
         xx.append(uniq[-1])
+        xx = sorted(list(set(xx)))
 
         im, _ = nrrd.read(self.image)
         n_mice = 0
         out = []
-        for i in range(0, len(xx), 2):
-            size = xx[i+1] - xx[i]
-            mp = int((xx[i+1] + xx[i])/2)
-            if size % 2 != 0:
-                size = size+1
-            if size > 86:
-                deltaX = int((size-86)/2)
+        min_size = int(np.ceil(17/np.abs(imageHD['space directions'][0,0])))
+        to_remove = []
+        to_add = []
+        z_0 = 0
+        z_1 = 1
+        while z_1 < len(xx):
+            size = xx[z_1] - xx[z_0]
+            if size < min_size:
+                to_remove.append(xx[z_1])
+                z_1 += 1
+            elif size > 2*min_size:
+                mp = int(size/2)
+                to_add.append(xx[z_0]+mp-3)
+                to_add.append(xx[z_0]+mp+3)
+                z_0 = z_1+1
+                z_1 += 2
             else:
-                deltaX = 0
-            sizeX=xx[i+1]-deltaX-(xx[i]+deltaX)
+                z_0 = z_1+1
+                z_1 += 2
+        
+        for el in to_remove:
+            xx.remove(el)
+        
+        for el in to_add:
+            xx.append(el)
+        
+        xx = sorted(xx)
+
+        if len(xx) % 2 != 0:
+            xx.remove(xx[-1])
+        
+        for i in range(0, len(xx), 2):
+            coordinates = {}
+            mp = int((xx[i+1] + xx[i])/2)
             croppedImage = im[mp-43:mp+43, indY-86:indY, deltaZ:dimZ-deltaZ]
             imageHD['sizes'] = np.array(croppedImage.shape)
-            
+            coordinates['x'] = [mp-43, mp+43]
+            coordinates['y'] = [indY-86, indY]
+            coordinates['z'] = [deltaZ, dimZ-deltaZ]
+
+            with open(self.imageOutname+'_mouse_{}.p'.format(n_mice), 'wb') as fp:
+                pickle.dump(coordinates, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
             nrrd.write(self.imageOutname+'_mouse_{}.nrrd'.format(n_mice),
                        croppedImage, header=imageHD)
             out.append(self.imageOutname+'_mouse_{}.nrrd'.format(n_mice))
