@@ -1,7 +1,7 @@
 from builtins import str
 import os
 import logging
-
+import re
 import avid.common.artefact.defaultProps as artefactProps
 import avid.common.artefact as artefactHelper
 
@@ -56,8 +56,10 @@ class FeatureExtractionAction(CLIActionBase):
                                                             artefactProps.OBJECTIVE))
         if self._resampling is not None:
             name += "_after_resampling_to_{}mm".format(self._resampling)
-            
-        name = name.replace('(','_').replace(')','_')
+        
+        pattern = re.compile('[\W]+')
+        name = pattern.sub('', name)    
+#         name = name.replace('(','_').replace(')','_')
           
         return name
     

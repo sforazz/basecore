@@ -17,6 +17,7 @@ class ImageCropping():
         filename = imageFilename.split('.')[0]
         if mask is not None:
             _, maskFilename, maskExt = split_filename(mask)
+            maskFilename = maskFilename.replace('.', '_')
             self.maskOutname = os.path.join(imagePath, maskFilename+'_cropped')+maskExt
 
         if prefix is None and mask is not None:
