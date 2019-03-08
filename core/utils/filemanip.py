@@ -77,3 +77,8 @@ def batch_processing(input_data, key_col1='subjects', key_col2='masks', root='')
         raw_data = [os.path.join(root, str(x)) for x in list(files[key_col1])] 
 
         return raw_data, masks
+
+
+def mergedict(a, b):
+    a.update(b)
+    return a
