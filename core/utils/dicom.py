@@ -84,11 +84,14 @@ def dcm_info(dcm_folder):
     series_nums : list
         list of unique series numbers extracted from the DICOMS
     """
-    dicoms = sorted(list(dcm_folder.glob('*.dcm')))
-    if not dicoms:
-        dicoms = sorted(list(dcm_folder.glob('*.IMA')))
+    if type(dcm_folder) is not list:
+        dicoms = sorted(list(dcm_folder.glob('*.dcm')))
         if not dicoms:
-            raise Exception('No DICOM files found in {}'.format(dcm_folder))
+            dicoms = sorted(list(dcm_folder.glob('*.IMA')))
+            if not dicoms:
+                raise Exception('No DICOM files found in {}'.format(dcm_folder))
+    else:
+        dicoms = dcm_folder
     ImageTypes = []
     SeriesNums = []
     AcqTimes = []

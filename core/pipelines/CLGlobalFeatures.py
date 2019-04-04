@@ -111,7 +111,7 @@ class FeatureExtractionAction(CLIActionBase):
 class FeatureExtractionBatchAction(BatchActionBase):
     '''Action for batch processing of the CLGlobalImageFeatures.'''
     
-    def __init__(self,  targetSelector, maskSelector, features='all', resampling=None,
+    def __init__(self,  targetSelector, maskSelector, same_tp=True, features='all', resampling=None,
                  maskLinker = CaseLinker(), actionTag = "CLGlobalFeatures", alwaysDo = False,
                  session = None, additionalActionProps = None, scheduler = SimpleScheduler(), **singleActionParameters):
       
@@ -125,6 +125,7 @@ class FeatureExtractionBatchAction(BatchActionBase):
         self._singleActionParameters = singleActionParameters
         self._features = features
         self._resampling = resampling
+        self._same_tp = same_tp
         
     def _generateActions(self):
         resultSelector = TypeSelector(artefactProps.TYPE_VALUE_RESULT)
@@ -135,6 +136,7 @@ class FeatureExtractionBatchAction(BatchActionBase):
                                              "CLGlobalFeatures masks")
         features = self._features
         resampling = self._resampling
+        same_tp = self._same_tp
         
         global logger
         
@@ -144,7 +146,14 @@ class FeatureExtractionBatchAction(BatchActionBase):
             linkedMasks = self._maskLinker.getLinkedSelection(pos, targets, masks)
             
             for lm in linkedMasks:
-                if lm['timePoint'] == target['timePoint']:
+                if lm['timePoint'] == target['timePoint'] and same_tp:
+                    action = FeatureExtractionAction(target, lm, features=features, resampling=resampling,
+                                                     actionTag=self._actionTag, alwaysDo=self._alwaysDo,
+                                                     session=self._session,
+                                                     additionalActionProps=self._additionalActionProps,
+                                                     **self._singleActionParameters)
+                    actions.append(action)
+                elif not same_tp:
                     action = FeatureExtractionAction(target, lm, features=features, resampling=resampling,
                                                      actionTag=self._actionTag, alwaysDo=self._alwaysDo,
                                                      session=self._session,

@@ -27,5 +27,5 @@ def violin_box_plot(to_plot):
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    plot.savefig('/home/fsforazz/Desktop/dsc2.png')
+    plot.savefig('/home/fsforazz/Desktop/hd_cheng_cv.png')
     plot.close()
