@@ -45,12 +45,14 @@ class DicomConverter(BaseConverter):
         else:
             raise NotImplementedError('The conversion from DICOM to {} has not been implemented yet.'
                                       .format(convert_to))
+        try:
+            sp.check_output(cmd, shell=True)
+            if self.clean:
+                self.clean_dir()
+            print('\nImage successfully converted!')
+        except:
+            print('Conversion failed. Scan will be ignored.')
 
-        sp.check_output(cmd, shell=True)
-
-        if self.clean:
-            self.clean_dir()
-        print('\nImage successfully converted!')
         return os.path.join(self.basedir, self.filename)+ext
 
     def clean_dir(self):
