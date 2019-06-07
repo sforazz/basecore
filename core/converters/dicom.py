@@ -6,7 +6,7 @@ import glob
 
 class DicomConverter(BaseConverter):
     
-    def convert(self, convert_to='nifti_gz', method='dcm2niix'):
+    def convert(self, convert_to='nifti_gz', method='dcm2niix', force=False):
 
         if convert_to == 'nrrd':
             print('\nConversion from DICOM to NRRD...')
@@ -30,8 +30,12 @@ class DicomConverter(BaseConverter):
             print('\nConversion from DICOM to NIFTI_GZ...')
             ext = '.nii.gz'
             if method == 'dcm2niix':
-                cmd = ("dcm2niix -o {0} -f {1} -z y {2}".format(self.basedir, self.filename,
-                                                                self.toConvert))
+                if force:
+                    cmd = ("dcm2niix -o {0} -f {1} -z y -p n -m y {2}".format(self.basedir, self.filename,
+                                                                         self.toConvert))
+                else:
+                    cmd = ("dcm2niix -o {0} -f {1} -z y -p n {2}".format(self.basedir, self.filename,
+                                                                         self.toConvert))
             else:
                 raise Exception('Not recognized {} method to convert from DICOM to NIFTI_GZ.'.format(method))
 
@@ -39,7 +43,10 @@ class DicomConverter(BaseConverter):
             print('\nConversion from DICOM to NIFTI...')
             ext = '.nii'
             if method == 'dcm2niix':
-                cmd = ("dcm2niix -o {0} -f {1} {2}".format(self.basedir, self.filename, self.toConvert))
+                if force:
+                    cmd = ("dcm2niix -o {0} -f {1} -p n -m y {2}".format(self.basedir, self.filename, self.toConvert))
+                else:    
+                    cmd = ("dcm2niix -o {0} -f {1} -p n {2}".format(self.basedir, self.filename, self.toConvert))
             else:
                 raise Exception('Not recognize {} method to convert from DICOM to NIFTI.'.format(method))
         else:

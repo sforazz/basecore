@@ -2,6 +2,7 @@ import pydicom
 import numpy as np
 from operator import itemgetter
 import collections
+from pydicom.errors import InvalidDicomError
 
 
 class DicomInfo(object):
@@ -94,18 +95,20 @@ def dcm_info(dcm_folder):
         dicoms = dcm_folder
     ImageTypes = []
     SeriesNums = []
-    AcqTimes = []
     toRemove = []
     InstanceNums = []
     for dcm in dicoms:
-        header = pydicom.read_file(str(dcm))
         try:
+            header = pydicom.read_file(str(dcm))
             ImageTypes.append(tuple(header.ImageType))
             SeriesNums.append(header.SeriesNumber)
-            AcqTimes.append(header.AcquisitionTime)
             InstanceNums.append(header.InstanceNumber)
         except AttributeError:
             print ('{} seems to do not have the right DICOM fields and '
+                   'will be removed from the folder'.format(dcm))
+            toRemove.append(dcm)
+        except InvalidDicomError:
+            print ('{} seems to do not have a readable DICOM header and '
                    'will be removed from the folder'.format(dcm))
             toRemove.append(dcm)
     if (len(InstanceNums) == 2*(len(set(InstanceNums)))) and len(set(SeriesNums)) == 1:
