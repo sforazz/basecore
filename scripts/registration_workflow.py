@@ -51,6 +51,7 @@ for sub in sub_list:
             workflow.connect(datasource, 'to_reg', reg, 'input_file')
             workflow.connect(reg, 'reg_file', datasink, 'registration.contrast.sub.@reg_image')
             workflow.connect(reg, 'regmat', datasink, 'registration.contrast.sub.@affine_mat')
+            workflow.connect(datasource, 'reference', datasink, 'registration.contrast.sub.@reference')
             
             workflow.run()
             # workflow.run('MultiProc', plugin_args={'n_procs': 4})
