@@ -3,6 +3,7 @@ import numpy as np
 from operator import itemgetter
 import collections
 from pydicom.errors import InvalidDicomError
+import os
 
 
 class DicomInfo(object):
@@ -11,7 +12,7 @@ class DicomInfo(object):
 
         if type(dicoms) == list:
             self.dcms = dicoms
-        else:
+        elif os.path.isdir(dicoms):
             dcms = list(dicoms.glob('*.dcm'))
             if not dcms:
                 dcms = list(dicoms.glob('*.IMA'))
@@ -19,12 +20,12 @@ class DicomInfo(object):
                 raise Exception('No DICOM files found in {}'.format(dicoms))
             else:
                 self.dcms = dcms
+        else:
+            self.dcms = [dicoms]
 
     def get_tag(self, tag):
         
         tags = {}
-        toRemove = []
-        instance_nums = None
 
         if type(tag) is not list:
             tag = [tag]
@@ -39,23 +40,10 @@ class DicomInfo(object):
                     else:
                         val = str(val)
                     values.append(val)
-                except AttributeError:
-                    print ('{} seems to do not have the right DICOM fields and '
-                           'will be removed from the folder'.format(dcm))
-                    toRemove.append(dcm)
+                except (AttributeError, KeyError):
+                    print ('{} seems to do not have the requested DICOM field ({})'.format(dcm, t))
 
-            if t == 'InstanceNumber':
-                instance_nums = values
             tags[t] = list(set(values))
-
-        try:
-            toRemove+self.check_uniqueness(instance_nums, tags['SeriesNumber'])
-        except:
-            pass
-
-        if toRemove:
-            for f in toRemove:
-                self.dcms.remove(f)
         
         return self.dcms, tags
 

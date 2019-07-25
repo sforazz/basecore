@@ -4,10 +4,10 @@ import nipype.interfaces.utility as util
 from nipype.interfaces.dcm2nii import Dcm2niix
 
 
-contrasts = ['CT', 'T1', 'T2', 'T1KM', 'ADC', 'SWI', 'FLAIR', 'T2KM']
-base_dir = '/mnt/sdb/sorted_data/Data_cinderella_MR_CLass'
-result_dir = '/mnt/sdb/Cinderella_sorted_nipype/'
-cache_dir = '/mnt/sdb/sorted_data/sorting_cache/'
+contrasts = ['T1KM', 'FLAIR', 'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM']
+base_dir = '/media/fsforazz/portable_hdd/data_sorted/CINDERELLA_FU_Modalities_SORTED_MR_CLass_MR_CLass'
+result_dir = '/mnt/sdb/Cinderella_FU_sorted_all/'
+cache_dir = '/mnt/sdb/sorted_data/sorting_cache2/'
 
 inputnode = nipype.Node(
     interface=util.IdentityInterface(fields=['contrasts']),

@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import os
 import nibabel as nib
+import glob
 
 
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
@@ -37,9 +38,11 @@ class DicomCheck(BaseInterface):
         sub_name = dicom_dir.split('/')[-4]
         tp = dicom_dir.split('/')[-3]
         scan_name = dicom_dir.split('/')[-2]
-
-        dicoms, im_types, series_nums = self.dcm_info()
-        dicoms = self.dcm_check(dicoms, im_types, series_nums)
+        if scan_name == 'RTSTRUCT':
+            dicoms = sorted(glob.glob(dicom_dir+'/*.dcm'))
+        else:
+            dicoms, im_types, series_nums = self.dcm_info()
+            dicoms = self.dcm_check(dicoms, im_types, series_nums)
         if dicoms:
             if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
@@ -188,8 +191,8 @@ class ConversionCheck(BaseInterface):
             for f in to_remove:
                 os.remove(f)
 
-        if scan_name != 'CT':
-            shutil.rmtree(os.path.join(base_dir, '{}'.format(scan_name)))
+#         if scan_name != 'CT':
+#             shutil.rmtree(os.path.join(base_dir, '{}'.format(scan_name)))
 
         if converted is not None:
             self.converted = converted[0]
@@ -222,5 +225,46 @@ class ConversionCheck(BaseInterface):
         outputs = self._outputs().get()
         if self.converted is not None:
             outputs['out_file'] = self.converted
+
+        return outputs
+
+
+class RemoveRTFilesInputSpec(BaseInterfaceInputSpec):
+
+    source_dir = traits.List()
+    out_filename = traits.List()
+    output_dir = traits.List()
+
+
+class RemoveRTFilesOutputSpec(TraitedSpec):
+
+    source_dir = traits.List()
+    out_filename = traits.List()
+    output_dir = traits.List()
+
+
+class RemoveRTFiles(BaseInterface):
+    
+    input_spec = RemoveRTFilesInputSpec
+    output_spec = RemoveRTFilesOutputSpec
+    
+    def _run_interface(self, runtime):
+        
+        source_dir = self.inputs.source_dir
+        out_filename = self.inputs.out_filename
+        output_dir = self.inputs.output_dir
+        
+        indexes = [i for i, x in enumerate(out_filename) if 'RTSTRUCT' not in x]
+        self.source_dir = [source_dir[x] for x in indexes]
+        self.out_filename = [out_filename[x] for x in indexes]
+        self.output_dir = [output_dir[x] for x in indexes]
+        
+        return runtime
+    
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['source_dir'] = self.source_dir
+        outputs['out_filename'] = self.out_filename
+        outputs['output_dir'] = self.output_dir
 
         return outputs

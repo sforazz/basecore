@@ -341,6 +341,7 @@ def matching_sessions(login, session_ids, with_scans=None,
         without_scans = ()
 
     def valid(session):
+        print('Session date: {}'.format(session.date))
         if before is not None and session.date > before:
             return False
         if after is not None and session.date < after:

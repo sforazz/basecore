@@ -5,10 +5,10 @@ import glob
 import os
 
 
-contrasts = ['T1', 'T2', 'T1KM', 'ADC', 'SWI', 'FLAIR', 'T2KM']
-base_dir = '/mnt/sdb/Cinderella_sorted_nipype/'
+contrasts = ['T1KM', 'FLAIR', 'ADC', 'T1', 'SWI', 'T2', 'T2KM']
+base_dir = '/mnt/sdb/Cinderella_FU_sorted_all/'
 cache_dir = '/mnt/sdb/nipype_reg_cache'
-result_dir = '/mnt/sdb/Cinderella_reg'
+result_dir = '/mnt/sdb/Cinderella_FU_reg_all'
 sub_list = [x for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))
             and glob.glob(os.path.join(base_dir,x,'*/CT.nii.gz'))]
 
@@ -38,7 +38,7 @@ for sub in sub_list:
             reg = nipype.MapNode(interface=AntsRegSyn(), iterfield=['input_file'], name='ants_reg')
             reg.inputs.transformation = 'r'
             reg.inputs.num_dimensions = 3
-            reg.inputs.num_threads = 6
+            reg.inputs.num_threads = 4
             
             datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
             substitutions = [('contrast', contrast), ('sub', sub)]
@@ -53,7 +53,7 @@ for sub in sub_list:
             workflow.connect(reg, 'regmat', datasink, 'registration.contrast.sub.@affine_mat')
             workflow.connect(datasource, 'reference', datasink, 'registration.contrast.sub.@reference')
             
-            workflow.run()
-            # workflow.run('MultiProc', plugin_args={'n_procs': 4})
+#             workflow.run()
+            workflow.run('MultiProc', plugin_args={'n_procs': 4})
 
 print('Done!')
