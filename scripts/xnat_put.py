@@ -20,7 +20,7 @@ credentials.
 """
 import argparse
 import logging
-from core.database.xnat import put
+from basecore.database.xnat import put
 
 
 logger = logging.getLogger('xnat-utils')

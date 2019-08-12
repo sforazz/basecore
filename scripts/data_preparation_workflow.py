@@ -1,4 +1,4 @@
-from core.interfaces.utils import DicomCheck, ConversionCheck
+from basecore.interfaces.utils import DicomCheck, ConversionCheck
 import nipype
 import nipype.interfaces.utility as util
 from nipype.interfaces.dcm2nii import Dcm2niix

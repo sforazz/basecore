@@ -1,5 +1,5 @@
 import nipype
-from core.interfaces.ants import AntsRegSyn
+from basecore.interfaces.ants import AntsRegSyn
 from _operator import sub
 import glob
 import os
