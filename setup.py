@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='basecore',
       version='1.0',
       description='Repository with several utilities',
-      url='https://github.com/sforazz/basecore.git',
+      url='https://github.com/sforazz/basecore',
       python_requires='>=3.5',
       author='Francesco Sforazzini',
       author_email='f.sforazzini@dkfz.de',
@@ -24,6 +24,7 @@ setup(name='basecore',
       'pytz==2018.9',
       'six==1.12.0'
       ],
+      packages=find_packages(exclude=['*.tests', '*.tests.*', 'tests.*', 'tests']),
       classifiers=[
           'Intended Audience :: Science/Research',
           'Programming Language :: Python',
