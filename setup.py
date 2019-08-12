@@ -1,9 +1,9 @@
 from setuptools import setup
 
-setup(name='core',
+setup(name='basecore',
       version='1.0',
       description='Repository with several utilities',
-      url='https://github.com/sforazz/core.git',
+      url='https://github.com/sforazz/basecore.git',
       python_requires='>=3.5',
       author='Francesco Sforazzini',
       author_email='f.sforazzini@dkfz.de',
