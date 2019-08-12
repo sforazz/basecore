@@ -12,6 +12,9 @@ import nibabel as nib
 import glob
 
 
+RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
+
+
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
     
     dicom_dir = Directory(exists=True, desc='Directory with the DICOM files to check')
@@ -38,8 +41,11 @@ class DicomCheck(BaseInterface):
         sub_name = dicom_dir.split('/')[-4]
         tp = dicom_dir.split('/')[-3]
         scan_name = dicom_dir.split('/')[-2]
-        if scan_name == 'RTSTRUCT':
+        if scan_name in RT_NAMES:
             dicoms = sorted(glob.glob(dicom_dir+'/*.dcm'))
+            if scan_name == 'RTDOSE':
+                dose_type = dicom_dir.split('/')[-1].split('_')[0][2:]
+                scan_name = scan_name+'/'+dose_type
         else:
             dicoms, im_types, series_nums = self.dcm_info()
             dicoms = self.dcm_check(dicoms, im_types, series_nums)
@@ -152,7 +158,7 @@ class DicomCheck(BaseInterface):
 
 class ConversionCheckInputSpec(BaseInterfaceInputSpec):
     
-    in_file = InputMultiPath(File(exists=True), desc='(List of) file that'
+    in_file = InputMultiPath(File(), desc='(List of) file that'
                              ' needs to be checked after DICOM to NIFTI conversion')
     file_name = traits.Str(desc='Name that the converted file has to match'
                            ' in order to be considered correct.')
@@ -189,10 +195,12 @@ class ConversionCheck(BaseInterface):
 
         if to_remove:
             for f in to_remove:
-                os.remove(f)
+                if os.path.isfile(f):
+                    os.remove(f)
 
-#         if scan_name != 'CT':
-#             shutil.rmtree(os.path.join(base_dir, '{}'.format(scan_name)))
+        if scan_name != 'CT':
+            if os.path.isdir(os.path.join(base_dir, '{}'.format(scan_name))):
+                shutil.rmtree(os.path.join(base_dir, '{}'.format(scan_name)))
 
         if converted is not None:
             self.converted = converted[0]

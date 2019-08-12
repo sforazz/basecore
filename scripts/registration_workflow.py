@@ -43,7 +43,7 @@ for sub in sub_list:
             datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
             substitutions = [('contrast', contrast), ('sub', sub)]
             for i, session in enumerate(sessions):
-                substitutions += [('_ants_reg{}'.format(i), session)]
+                substitutions += [('_ants_reg{}/'.format(i), session+'/')]
             datasink.inputs.substitutions =substitutions
             
             workflow = nipype.Workflow('registration_workflow', base_dir=cache_dir)

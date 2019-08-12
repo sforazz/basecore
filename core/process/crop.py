@@ -94,11 +94,11 @@ class ImageCropping():
         deltaZ = int(np.ceil((dimZ-86)/2))
         mean_Z = int(np.ceil((dimZ)/2))
 
-        im[im<-200] = -1024
+        im[im<np.min(im)+824] = np.min(im)
 
-        _, y1 = np.where(im[:, :, mean_Z]!=-1024)
+        _, y1 = np.where(im[:, :, mean_Z]!=np.min(im))
         im = im[:, np.min(y1)-10:np.min(y1)+100, :]
-        x, y = np.where(im[:, :, mean_Z]!=-1024)
+        x, y = np.where(im[:, :, mean_Z]!=np.min(im))
         indY = np.max(y) + np.min(y1)
         uniq = list(set(x))
         xx = [uniq[0]]
@@ -112,7 +112,7 @@ class ImageCropping():
         im, _ = nrrd.read(self.image)
         n_mice = 0
         out = []
-        min_size = int(np.ceil(17/np.abs(imageHD['space directions'][0,0])))
+        min_size = int(np.ceil(17/np.abs(imageHD['space directions'][0, 0])))
         to_remove = []
         to_add = []
         z_0 = 0
@@ -146,7 +146,7 @@ class ImageCropping():
         for i in range(0, len(xx), 2):
             coordinates = {}
             mp = int((xx[i+1] + xx[i])/2)
-            croppedImage = im[mp-43:mp+43, indY-86:indY, deltaZ:dimZ-deltaZ]
+            croppedImage = im[mp-43:mp+43, indY-86:indY, deltaZ+15:dimZ-deltaZ+15]
             imageHD['sizes'] = np.array(croppedImage.shape)
             coordinates['x'] = [mp-43, mp+43]
             coordinates['y'] = [indY-86, indY]

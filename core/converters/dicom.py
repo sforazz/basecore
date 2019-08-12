@@ -10,11 +10,10 @@ class DicomConverter(BaseConverter):
 
         if convert_to == 'nrrd':
             print('\nConversion from DICOM to NRRD...')
-            if method=='dcm2niix':
-                method = 'mitk'
-
             ext = '.nrrd'
-            if method=='slicer':
+            if method=='dcm2niix':
+                cmd = ("dcm2niix -o {0} -f {1} -e y {2}".format(self.basedir, self.filename, self.basedir))
+            elif method=='slicer':
                 cmd = (('Slicer --no-main-window --python-code '+'"node=slicer.util.loadVolume('+
                     "'{0}', returnNode=True)[1]; slicer.util.saveNode(node, '{1}'); exit()"+'"')
                     .format(self.toConvert, os.path.join(self.basedir, self.filename)+ext))
