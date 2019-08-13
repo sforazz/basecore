@@ -11,7 +11,6 @@ import subprocess as sp
 def binarization(image):
     
     th = threshold_otsu(image)
-    print(th)
     image[image>=th] = 1
     image[image!=1] = 0
     
