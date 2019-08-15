@@ -7,9 +7,9 @@ from basecore.interfaces.ants import AntsRegSyn
 
 
 contrasts = ['T1KM']
-base_dir = '/mnt/sdb/test_temp_ana/'
-cache_dir = '/mnt/sdb/temporal_analysis_seg_reg_cache'
-result_dir = '/mnt/sdb/Cinderella_FU_temporal_analysis_seg_reg'
+base_dir = '/nfs/extra_hd/Cinderella_FU_temporal_analysis/preprocessing/T1KM/'
+cache_dir = '/mnt/hdd/temporal_analysis_seg_reg_cache'
+result_dir = '/mnt/hdd/Cinderella_FU_temporal_analysis_seg_reg'
 sub_list = sub_list = [os.path.join(base_dir,x) for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))]
 
 for n, sub in enumerate(sub_list):
@@ -41,9 +41,9 @@ for n, sub in enumerate(sub_list):
         fast_ref.inputs.segments = True
         
         reg = nipype.MapNode(interface=AntsRegSyn(), iterfield=['input_file'], name='ants_reg')
-        reg.inputs.transformation = 'r'
+        reg.inputs.transformation = 's'
         reg.inputs.num_dimensions = 3
-        reg.inputs.num_threads = 1
+        reg.inputs.num_threads = 6
         
         datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
         substitutions = [('contrast', contrast), ('sub', sub.split('/')[-1]), ('session', ref_tp+'_reference_tp')]
@@ -57,13 +57,14 @@ for n, sub in enumerate(sub_list):
         workflow.connect(datasource, 'to_reg', fast_1, 'in_files')
         workflow.connect(datasource, 'reference', reg, 'ref_file')
         workflow.connect(datasource, 'to_reg', reg, 'input_file')
-        workflow.connect(fast_1, 'tissue_class_files', datasink, 'preprocessing.contrast.sub.@fast_file')
-        workflow.connect(fast_ref, 'tissue_class_files', datasink, 'preprocessing.contrast.sub.@fast_ref_file')
-        workflow.connect(reg, 'reg_file', datasink, 'registration.contrast.sub.@reg_image')
-        workflow.connect(reg, 'regmat', datasink, 'registration.contrast.sub.@affine_mat')
-        workflow.connect(datasource, 'reference', datasink, 'registration.contrast.sub.@reference')
+        workflow.connect(fast_1, 'tissue_class_files', datasink, 'seg_reg_preprocessing.contrast.sub.@fast_file')
+        workflow.connect(fast_ref, 'tissue_class_files', datasink,
+                         'seg_reg_preprocessing.contrast.sub.reference_tp.@fast_ref_file')
+        workflow.connect(reg, 'reg_file', datasink, 'seg_reg_preprocessing.contrast.sub.@reg_image')
+        workflow.connect(reg, 'regmat', datasink, 'seg_reg_preprocessing.contrast.sub.@affine_mat')
+        workflow.connect(datasource, 'reference', datasink, 'seg_reg_preprocessing.contrast.sub.reference_tp.@reference')
         
-        workflow.run()
-#             workflow.run('MultiProc', plugin_args={'n_procs': 4})
+#         workflow.run()
+        workflow.run('MultiProc', plugin_args={'n_procs': 4})
 
 print('Done!')
