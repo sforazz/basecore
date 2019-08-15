@@ -53,20 +53,28 @@ class HDBet(CommandLine):
         outputs['out_file'] = self._gen_outfilename('out_file')
         if isdefined(self.inputs.save_mask and self.inputs.save_mask != 0):
             outputs['out_mask'] = self._gen_outfilename('out_mask')
+
+        return outputs
         
 
     def _gen_outfilename(self, name):
         if name == 'out_file':
             out_file = self.inputs.out_file
+            if isdefined(out_file) and isdefined(self.inputs.input_file):
+                _, _, ext = split_filename(self.inputs.input_file)
+                out_file = self.inputs.out_file+ext
             if not isdefined(out_file) and isdefined(self.inputs.input_file):
                 pth, fname, ext = split_filename(self.inputs.input_file)
                 print(pth, fname, ext)
                 out_file = os.path.join(pth, fname+'_bet'+ext)
         elif name == 'out_mask':
             out_file = self.inputs.out_file
-            if isdefined(out_file):
-                pth, fname, ext = split_filename(out_file)
-                out_file = os.path.join(pth, fname+'_bet_mask'+ext)
+            if isdefined(out_file) and isdefined(self.inputs.input_file):
+                _, _, ext = split_filename(self.inputs.input_file)
+                out_file = self.inputs.out_file+'_mask'+ext
+#             if isdefined(out_file):
+#                 pth, fname, ext = split_filename(out_file)
+#                 out_file = os.path.join(pth, fname+'_bet_mask'+ext)
             elif not isdefined(out_file) and isdefined(self.inputs.input_file):
                 pth, fname, ext = split_filename(self.inputs.input_file)
                 print(pth, fname, ext)

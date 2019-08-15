@@ -11,7 +11,7 @@ ALLOWED_EXT = ['.xlsx', '.csv']
 ILLEGAL_CHARACTERS = ['/', '(', ')', '[', ']', '{', '}', ' ', '-']
 
     
-def mouse_lung_data_preparation(raw_data, temp_dir):
+def dicom_check(raw_data, temp_dir):
     """Function to arrange the mouse lung data into a proper struture.
     In particular, this function will look into each raw_data folder searching for
     the data with H50s in the series description field in the DICOM header. Then,
