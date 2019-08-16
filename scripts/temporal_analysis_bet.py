@@ -31,8 +31,8 @@ def find_subs(basedir):
 
 contrasts = ['T1KM']
 base_dir = '/mnt/sdb/Cinderella_FU_sorted_all/'
-cache_dir = '/mnt/sdb/temporal_analysis_cache'
-result_dir = '/mnt/sdb/Cinderella_FU_temporal_analysis'
+cache_dir = '/mnt/sdb/bet_cache'
+result_dir = '/mnt/sdb/Cinderella_FU_bet'
 cts, sub_list = find_subs(base_dir)
 
 for n, sub in enumerate(sub_list):
@@ -60,7 +60,9 @@ for n, sub in enumerate(sub_list):
             datasource.inputs.sessions = sessions
             datasource.inputs.ref_tp = ref_tp
             
-            
+            rf_1 = nipype.MapNode(interface=fsl.RobustFOV(), iterfield=['in_file'], name='rf_1')
+            rf_ref = nipype.Node(interface=fsl.RobustFOV(), name='rf_ref')
+
             bet_1 = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet_1')
             bet_1.inputs.save_mask = 1
             bet_1.inputs.out_file = '{}_bet'.format(contrast)
@@ -84,10 +86,10 @@ for n, sub in enumerate(sub_list):
             datasink.inputs.substitutions =substitutions
             
             workflow = nipype.Workflow('temporal_analysis_preproc_workflow', base_dir=cache_dir)
-            workflow.connect(datasource, 'reference', bet_ref, 'input_file')
-            workflow.connect(datasource, 'to_reg', bet_1, 'input_file')
-#             workflow.connect(bet_1, 'out_file', fast_1, 'in_files')
-#             workflow.connect(bet_ref, 'out_file', fast_ref, 'in_files')
+            workflow.connect(datasource, 'reference', rf_ref, 'in_file')
+            workflow.connect(datasource, 'to_reg', rf_1, 'in_file')
+            workflow.connect(rf_1, 'out_roi', bet_1, 'input_file')
+            workflow.connect(rf_ref, 'out_roi', bet_ref, 'input_file')
             workflow.connect(bet_1, 'out_file', datasink, 'preprocessing.contrast.sub.@bet_file')
             workflow.connect(bet_1, 'out_mask', datasink, 'preprocessing.contrast.sub.@bet_mask')
             workflow.connect(bet_ref, 'out_file', datasink, 'preprocessing.contrast.sub.session.@bet_ref_file')
