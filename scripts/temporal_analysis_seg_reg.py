@@ -8,8 +8,8 @@ from basecore.interfaces.ants import AntsRegSyn
 
 contrasts = ['T1KM']
 base_dir = '/nfs/extra_hd/Cinderella_FU_temporal_analysis/preprocessing/T1KM/'
-cache_dir = '/mnt/hdd/temporal_analysis_seg_reg_cache'
-result_dir = '/mnt/hdd/Cinderella_FU_temporal_analysis_seg_reg'
+cache_dir = '/mnt/hdd/_seg_reg_cache'
+result_dir = '/mnt/hdd/Cinderella_FU_seg_reg'
 sub_list = sub_list = [os.path.join(base_dir,x) for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))]
 
 for n, sub in enumerate(sub_list):
@@ -52,7 +52,7 @@ for n, sub in enumerate(sub_list):
             substitutions += [('_ants_reg{}/'.format(i), session+'/')]
         datasink.inputs.substitutions =substitutions
         
-        workflow = nipype.Workflow('temporal_analysis_preproc_workflow', base_dir=cache_dir)
+        workflow = nipype.Workflow('seg_reg_workflow', base_dir=cache_dir)
         workflow.connect(datasource, 'reference', fast_ref, 'in_files')
         workflow.connect(datasource, 'to_reg', fast_1, 'in_files')
         workflow.connect(datasource, 'reference', reg, 'ref_file')
