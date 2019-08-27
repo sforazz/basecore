@@ -7,10 +7,11 @@ from basecore.interfaces.ants import AntsRegSyn
 
 
 contrasts = ['T1KM']
-base_dir = '/nfs/extra_hd/Cinderella_FU_temporal_analysis/preprocessing/T1KM/'
+base_dir = '/nfs/extra_hd/Cinderella_FU_bet/preprocessing/T1KM/'
 cache_dir = '/mnt/hdd/seg_reg_cache'
 result_dir = '/mnt/hdd/Cinderella_FU_seg_reg'
-sub_list = sub_list = [os.path.join(base_dir,x) for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))]
+sub_list = [os.path.join(base_dir,x) for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))]
+sub_list = [x for x in sub_list if x.split('/')[-1] not in ['08L8HA92', '0ELEU3HF', '0VPG487M', '1311LGAE', '17EZUADD', '2J5LR45Q', '3ND7HJ92', '40E3HNPG', '4K3Z8GH5', '5AKETE27']]
 
 for n, sub in enumerate(sub_list):
     for contrast in contrasts:
