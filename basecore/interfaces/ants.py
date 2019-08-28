@@ -1,7 +1,9 @@
 from nipype.interfaces.base import (
     TraitedSpec, traits, File, CommandLineInputSpec, CommandLine)
+from nipype.interfaces.ants.base import ANTSCommand, ANTSCommandInputSpec
 import os.path as op
 from nipype.interfaces.base import isdefined
+from nipype.interfaces.base.traits_extension import InputMultiPath
 
 
 class AntsRegSynInputSpec(CommandLineInputSpec):
@@ -59,12 +61,39 @@ class AntsRegSyn(CommandLine):
         outputs['reg_file'] = op.abspath(self.inputs.out_prefix +
                                          'Warped.nii.gz')
         if isdefined(self.inputs.transformation and
-                     (self.inputs.transformation != 'r' or
+                     (self.inputs.transformation != 's' or
                       self.inputs.transformation != 'a' or
-                      self.inputs.transformation != 't')):
+                      self.inputs.transformation != 'b')):
             outputs['warp_file'] = op.abspath(
                 self.inputs.out_prefix + '1Warp.nii.gz')
             outputs['inv_warp'] = op.abspath(
                 self.inputs.out_prefix + '1InverseWarp.nii.gz')
 
         return outputs
+
+
+class ResampleImageInputSpec(ANTSCommandInputSpec):
+    
+    dimensions = traits.Enum(3, 2, argstr='%d', usedefault=True, position=0,
+                             desc='image dimension (2 or 3)')
+    in_file = File(exists=True, mandatory=True, desc='Image to resample',
+                   position=1, argstr='%s')
+    out_file = File(exists=True, desc='Name of the output file.', name_source=['in_file'],
+                    name_template='%s_resampled', keep_extension=True, position=2,
+                    argstr='%s')
+    new_size = traits.Str(argstr='%s', position=3, mandatory=True)
+    mode = traits.Enum(0, 1, argstr='%d', position=4, usedefault=True,
+                       desc='0 is size was specified, 1 if voxels were specified.')
+    interpolation = traits.Enum(0, 1, 2, 3, 4, argstr='%d', position=5,
+                                desc='Interpolation to use', usedefault=True)
+
+
+class ResampleImageOutputSpec(TraitedSpec):
+    out_file = File(exists=True, desc='Resampled image')
+
+
+class ResampleImage(ANTSCommand):
+    
+    _cmd = 'ResampleImage'
+    input_spec = ResampleImageInputSpec
+    output_spec = ResampleImageOutputSpec
