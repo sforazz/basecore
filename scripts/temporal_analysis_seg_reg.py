@@ -35,12 +35,6 @@ for n, sub in enumerate(sub_list):
         datasource.inputs.sessions = sessions
         datasource.inputs.ref_tp = ref_tp
         
-        rs_1 = nipype.MapNode(interface=ResampleImage(), iterfield=['in_file'], name='rs_1')
-        rs_1.inputs.new_size = '1x1x1'
-        rs_1.inputs.mode = 0
-        rs_1.inputs.interpolation = 0
-        rs_1.inputs.dimensions = 3
-        
         rs_ref = nipype.Node(interface=ResampleImage(), name='rs_ref')
         rs_ref.inputs.new_size = '1x1x1'
         rs_ref.inputs.mode = 0
@@ -86,11 +80,10 @@ for n, sub in enumerate(sub_list):
         
         workflow = nipype.Workflow('seg_reg_workflow', base_dir=cache_dir)
         workflow.connect(datasource, 'reference', rs_ref, 'in_file')
-        workflow.connect(datasource, 'to_reg', rs_1, 'in_file')
+        workflow.connect(datasource, 'to_reg', fast_1, 'in_files')
+        workflow.connect(datasource, 'to_reg', reg, 'input_file')
         workflow.connect(rs_ref, 'out_file', fast_ref, 'in_files')
-        workflow.connect(rs_1, 'out_file', fast_1, 'in_files')
         workflow.connect(rs_ref, 'out_file', reg, 'ref_file')
-        workflow.connect(rs_1, 'out_file', reg, 'input_file')
         workflow.connect(fast_1, 'tissue_class_files', datasink, 'seg_reg_preprocessing.contrast.sub.@fast_file')
         workflow.connect(fast_ref, 'tissue_class_files', datasink,
                          'seg_reg_preprocessing.contrast.sub.reference_tp.@fast_ref_file')
