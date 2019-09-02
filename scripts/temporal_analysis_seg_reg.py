@@ -12,11 +12,13 @@ base_dir = '/nfs/extra_hd/Cinderella_FU_bet/preprocessing/T1KM/'
 cache_dir = '/mnt/hdd/seg_reg_cache'
 result_dir = '/mnt/hdd/Cinderella_FU_seg_reg2'
 sub_list = [os.path.join(base_dir,x) for x in sorted(os.listdir(base_dir)) if os.path.isdir(os.path.join(base_dir,x))]
-# sub_list = [x for x in sub_list if x.split('/')[-1] not in ['08L8HA92', '0ELEU3HF', '0VPG487M', '1311LGAE', '17EZUADD', '2J5LR45Q', '3ND7HJ92', '40E3HNPG', '4K3Z8GH5', '5AKETE27']]
-# sub_list = [x for x in sub_list if x.split('/')[-1] in ['0ELEU3HF']]
+sub_list = [x for x in sub_list if x.split('/')[-1] not in ['40E3HNPG', '0ELEU3HF', '5AKETE27', '5XD8G652',
+                                                            '80H0W2L7', 'CTLH9GXW', 'E4A57N7T', 'E9PWKTRN']]
+# sub_list = [x for x in sub_list if x.split('/')[-1] in ['40E3HNPG', '']]
 
 for n, sub in enumerate(sub_list):
     for contrast in contrasts:
+        sub_name = sub.split('/')[-1]
         sessions = [x.split('/')[-1] for x in sorted(glob.glob(os.path.join(sub, '*'))) if 'reference_tp' not in x]
         ref_tp = [x.split('/')[-1] for x in sorted(glob.glob(os.path.join(sub, '*'))) if 'reference_tp' in x][0]
         datasource = nipype.Node(
@@ -71,14 +73,14 @@ for n, sub in enumerate(sub_list):
                          ('seg_0.', 'CSF.'), ('seg_0_trans', 'CSF_mapped'), ('seg_1', 'GM'), ('seg_2', 'WM'),
                          ('antsreg0GenericAffine.mat', 'Affine_mat.mat'), ('antsreg1Warp', 'Warp_field'),
                          ('antsreg1InverseWarp', 'Inverse_warp_field'),
-                         ('antsregWarped', '{}_bet_resampled_mapped'.format(contrast))]
+                         ('antsregWarped', '{}_bet_mapped'.format(contrast))]
         for i, session in enumerate(sessions):
             substitutions += [('_fast_1{}/'.format(i), session+'/')]
             substitutions += [('_ants_reg{}/'.format(i), session+'/')]
             substitutions += [('_apply_ts{}/'.format(i), session+'/')]
         datasink.inputs.substitutions =substitutions
         
-        workflow = nipype.Workflow('seg_reg_workflow', base_dir=cache_dir)
+        workflow = nipype.Workflow('seg_reg_workflow', base_dir=os.path.join(cache_dir, sub_name+'_'+contrast))
         workflow.connect(datasource, 'reference', rs_ref, 'in_file')
         workflow.connect(datasource, 'to_reg', fast_1, 'in_files')
         workflow.connect(datasource, 'to_reg', reg, 'input_file')
