@@ -64,7 +64,7 @@ for n, sub in enumerate(sub_list):
         reg.inputs.num_threads = 4
         
         apply_ts = nipype.MapNode(interface=ApplyTransforms(),
-                                  iterfield=['input_image', 'transforms', 'reference_image'], name='apply_ts')
+                                  iterfield=['input_image', 'transforms'], name='apply_ts')
         apply_ts.inputs.dimension = 3
         apply_ts.inputs.interpolation = 'NearestNeighbor'
         
@@ -80,7 +80,8 @@ for n, sub in enumerate(sub_list):
             substitutions += [('_apply_ts{}/'.format(i), session+'/')]
         datasink.inputs.substitutions =substitutions
         
-        workflow = nipype.Workflow('seg_reg_workflow', base_dir=os.path.join(cache_dir, sub_name+'_'+contrast))
+        workflow = nipype.Workflow('seg_reg_workflow',
+                                   base_dir=os.path.join(cache_dir, sub_name+'_'+contrast))
         workflow.connect(datasource, 'reference', rs_ref, 'in_file')
         workflow.connect(datasource, 'to_reg', fast_1, 'in_files')
         workflow.connect(datasource, 'to_reg', reg, 'input_file')

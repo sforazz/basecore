@@ -30,7 +30,7 @@ inputnode_rt.iterables = ('rt_files', rt_files)
 
 datasource_rt = nipype.Node(
     interface=nipype.DataGrabber(infields=['rt_files'], outfields=['directory']),
-    name='datasource_rt')  
+    name='datasource_rt')
 datasource_rt.inputs.base_directory = base_dir
 datasource_rt.inputs.template = '*'
 datasource_rt.inputs.sort_filelist = True
