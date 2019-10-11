@@ -11,7 +11,7 @@ class CLGlobalFeaturesInputSpec(CommandLineInputSpec):
         exists=True, mandatory=True, argstr='-i %s',
         desc='Existing file from where the features will be extracted.')
     mask = InputMultiPath(
-        File(exists=True), mandatory=True, argstr='-m %s',
+        File(exists=True), mandatory=True, argstr='-m "%s"',
         desc='Binary mask to be used to extract the features.')
     out_name = traits.Str(
         'mitk_features.csv', argstr='-o %s', usedefault=True, mandatory=True,

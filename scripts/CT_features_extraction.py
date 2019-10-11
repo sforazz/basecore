@@ -24,9 +24,9 @@ def creste_sub_list(basedir):
                         data.append(os.path.join(sub_name, current_tp))
     return data
 
-base_dir = '/mnt/sdb/Cinderella_FU_sorted_all_test/'
+base_dir = '/mnt/sdb/anal_sorted/'
 cache_dir = '/mnt/sdb/feat_cache'
-result_dir = '/mnt/sdb/Cinderella_FU_fe_test'
+result_dir = '/mnt/sdb/anal_fe'
 sub_list = creste_sub_list(base_dir)
 
 datasource = nipype.Node(
@@ -44,7 +44,7 @@ datasource.inputs.sub_id = sub_list
 
 voxelizer = nipype.MapNode(interface=Voxelizer(), iterfield=['reference', 'struct_file'],
                            name='voxelizer')
-voxelizer.inputs.regular_expression = '.*GTV.*'
+voxelizer.inputs.regular_expression = '.*PTV.*'
 voxelizer.inputs.multi_structs = True
 voxelizer.inputs.binarization = True
 
@@ -57,7 +57,7 @@ features.inputs.int_vol_hist = True
 features.inputs.local_intensity = True
 features.inputs.volume = True
 features.inputs.id = True
-features.inputs.ngld = True
+# features.inputs.ngld = True
 features.inputs.ngtd = True
 features.inputs.use_header = True
 
@@ -74,7 +74,7 @@ workflow.connect(datasource, 'ct', features, 'in_file')
 workflow.connect(voxelizer, 'out_files', features, 'mask')
 workflow.connect(features, 'out_file', datasink, 'features_extraction.@csv_file')
 
-# workflow.run()
-workflow.run('MultiProc', plugin_args={'n_procs': 4})
+workflow.run()
+# workflow.run('MultiProc', plugin_args={'n_procs': 4})
 print('Done!')
 

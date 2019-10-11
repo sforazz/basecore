@@ -22,7 +22,8 @@ setup(name='basecore',
       'pyparsing==2.3.1',
       'python-dateutil==2.7.5',
       'pytz==2018.9',
-      'six==1.12.0'
+      'six==1.12.0',
+      'nipype==1.2.0'
       ],
       packages=find_packages(exclude=['*.tests', '*.tests.*', 'tests.*', 'tests']),
       classifiers=[
