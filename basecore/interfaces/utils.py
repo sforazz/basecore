@@ -16,23 +16,23 @@ RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
 
 
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
-    
+
     dicom_dir = Directory(exists=True, desc='Directory with the DICOM files to check')
     working_dir = Directory(exists=True, desc='Base directory to save the corrected DICOM files')
 
 
 class DicomCheckOutputSpec(TraitedSpec):
-    
+
     outdir = Directory(exists=True, desc='Path to the directory with the corrected DICOM files')
     scan_name = traits.Str(desc='Scan name')
     base_dir = Directory(exists=True, desc='Root path of outdir')
 
 
 class DicomCheck(BaseInterface):
-    
+
     input_spec = DicomCheckInputSpec
     output_spec = DicomCheckOutputSpec
-    
+
     def _run_interface(self, runtime):
 
         dicom_dir = self.inputs.dicom_dir
