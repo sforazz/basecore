@@ -1,4 +1,4 @@
-import glob
+import globf
 import os
 import nipype
 from basecore.interfaces.mitk import Voxelizer, CLGlobalFeatures
