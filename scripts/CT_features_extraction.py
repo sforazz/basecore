@@ -3,7 +3,7 @@ import os
 import nipype
 from basecore.interfaces.mitk import Voxelizer, CLGlobalFeatures
 
-
+tgggggg
 def creste_sub_list(basedir):
 
     processed_subs = []
