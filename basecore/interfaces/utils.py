@@ -38,9 +38,10 @@ class DicomCheck(BaseInterface):
         dicom_dir = self.inputs.dicom_dir
         wd = self.inputs.working_dir
 
-        sub_name = dicom_dir.split('/')[-4]
-        tp = dicom_dir.split('/')[-3]
-        scan_name = dicom_dir.split('/')[-2]
+        sub_name = dicom_dir.split('/')[-2]
+#         tp = dicom_dir.split('/')[-3]
+        tp = ''
+        scan_name = dicom_dir.split('/')[-1]
         if scan_name in RT_NAMES:
             dicoms = sorted(glob.glob(dicom_dir+'/*.dcm'))
             if scan_name == 'RTDOSE':
@@ -61,7 +62,7 @@ class DicomCheck(BaseInterface):
             self.scan_name = scan_name
             self.base_dir = os.path.join(wd, sub_name, tp)
         return runtime
-    
+
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs['outdir'] = self.outdir
@@ -145,19 +146,19 @@ class DicomCheck(BaseInterface):
         if len(im_types) > 1:
             im_type = list([x for x in im_types if not
                             'PROJECTION IMAGE' in x][0])
-    
+
             dcms = [x for x in dicoms if pydicom.read_file(str(x)).ImageType==im_type]
         elif len(series_nums) > 1:
             series_num = np.max(series_nums)
             dcms = [x for x in dicoms if pydicom.read_file(str(x)).SeriesNumber==series_num]
         else:
             dcms = dicoms
-        
+
         return [str(x) for x in dcms]
 
 
 class ConversionCheckInputSpec(BaseInterfaceInputSpec):
-    
+
     in_file = InputMultiPath(File(), desc='(List of) file that'
                              ' needs to be checked after DICOM to NIFTI conversion')
     file_name = traits.Str(desc='Name that the converted file has to match'
@@ -165,15 +166,15 @@ class ConversionCheckInputSpec(BaseInterfaceInputSpec):
 
 
 class ConversionCheckOutputSpec(TraitedSpec):
-    
+
     out_file = traits.Str()
 
 
 class ConversionCheck(BaseInterface):
-    
+
     input_spec = ConversionCheckInputSpec
     output_spec = ConversionCheckOutputSpec
-    
+
     def _run_interface(self, runtime):
 
         converted = self.inputs.in_file
@@ -185,7 +186,8 @@ class ConversionCheck(BaseInterface):
         if len(extra) == len(converted):
             if len(extra) == 2 and scan_name == 'T2':
                 to_remove.append(extra[0])
-                os.rename(extra[1], os.path.join(base_dir, 'T2.nii.gz'))
+                if not os.path.isfile(os.path.join(base_dir, 'T2.nii.gz')):
+                    shutil.copy2(extra[1], os.path.join(base_dir, 'T2.nii.gz'))
                 converted = [os.path.join(base_dir, 'T2.nii.gz')]
             else:
                 to_remove += extra
@@ -193,10 +195,10 @@ class ConversionCheck(BaseInterface):
         else:
             to_remove += extra
 
-        if to_remove:
-            for f in to_remove:
-                if os.path.isfile(f):
-                    os.remove(f)
+#         if to_remove:
+#             for f in to_remove:
+#                 if os.path.isfile(f):
+#                     os.remove(f)
 
         if scan_name != 'CT':
             if os.path.isdir(os.path.join(base_dir, '{}'.format(scan_name))):
@@ -208,21 +210,24 @@ class ConversionCheck(BaseInterface):
                 ref = nib.load(self.converted)
                 data = ref.get_data()
                 if len(data.squeeze().shape) == 2 or len(data.squeeze().shape) > 4:
-                    os.remove(self.converted)
+                    if os.path.isfile(self.converted):
+                        os.remove(self.converted)
                 elif len(data.squeeze().shape) == 4:
                     im2save = nib.Nifti1Image(data[:, :, :, 0], affine=ref.affine)
                     nib.save(im2save, self.converted)
                 elif len(data.dtype) > 0:
                     print('{} is not a greyscale image. It will be deleted.'.format(self.converted))
-                    os.remove(self.converted)
+                    if os.path.isfile(self.converted):
+                        os.remove(self.converted)
             except:
                 print('{} failed to save with nibabel. It will be deleted.'.format(self.converted))
-                os.remove(self.converted)
+                if os.path.isfile(self.converted):
+                    os.remove(self.converted)
             if os.path.isfile(self.converted):
                 self.converted = self.converted
         else:
             self.converted = None
-        
+
         if self.inputs.in_file and self.converted is None:
             with open(os.path.join(base_dir, 'corrupeted_scans.txt'), 'a') as f:
                 f.write('{}'.format(scan_name))

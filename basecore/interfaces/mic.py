@@ -55,7 +55,6 @@ class HDBet(CommandLine):
             outputs['out_mask'] = self._gen_outfilename('out_mask')
 
         return outputs
-        
 
     def _gen_outfilename(self, name):
         if name == 'out_file':
@@ -79,7 +78,7 @@ class HDBet(CommandLine):
                 pth, fname, ext = split_filename(self.inputs.input_file)
                 print(pth, fname, ext)
                 out_file = os.path.join(pth, fname+'_bet_mask'+ext)
-            
+
         return os.path.abspath(out_file)
 
     def _gen_filename(self, name):
@@ -88,4 +87,47 @@ class HDBet(CommandLine):
         elif name == 'out_mask':
             return self._gen_outfilename('out_mask')
         return None
-    
+
+
+class HDGlioPredictInputSpec(CommandLineInputSpec):
+
+    t1 = traits.File(mandatory=True, exists=True, argstr='-t1 %s',
+                     desc='T1 weighted image')
+    t1c = traits.File(mandatory=True, exists=True, argstr='-t1c %s',
+                      desc='T1 weighted image')
+    t2 = traits.File(mandatory=True, exists=True, argstr='-t2 %s',
+                     desc='T1 weighted image')
+    flair = traits.File(mandatory=True, exists=True, argstr='-flair %s',
+                        desc='T1 weighted image')
+    out_file = traits.Str(argstr='-o %s', desc='output file (or folder) name.')
+
+
+class HDGlioPredictOutputSpec(TraitedSpec):
+
+    out_file = File(desc='Brain extracted image.')
+
+
+class HDGlioPredict(CommandLine):
+
+    _cmd = 'hd_glio_predict'
+    input_spec = HDGlioPredictInputSpec
+    output_spec = HDGlioPredictOutputSpec
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        outputs['out_file'] = self._gen_outfilename()
+
+        return outputs
+
+    def _gen_outfilename(self):
+
+        out_file = self.inputs.out_file
+        if isdefined(out_file) and isdefined(self.inputs.t1):
+            _, _, ext = split_filename(self.inputs.input_file)
+            out_file = self.inputs.out_file+ext
+        if not isdefined(out_file) and isdefined(self.inputs.input_file):
+            pth, _, ext = split_filename(self.inputs.input_file)
+            print(pth, ext)
+            out_file = os.path.join(pth, 'segmentation'+ext)
+
+        return os.path.abspath(out_file)
