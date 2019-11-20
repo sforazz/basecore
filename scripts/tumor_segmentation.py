@@ -121,7 +121,7 @@ if __name__ == "__main__":
         workflow.connect(reg_nodes[i], 'reg_file', mask, 'in_file')
         workflow.connect(bet, 'out_mask', mask, 'mask_file')
         workflow.connect(mask, 'out_file', datasink,
-                         'tumor_seg_preproc.@{}_preproc'.format(sequences[i+1]))
+                         'results.@{}_preproc'.format(sequences[i+1]))
     workflow.connect(cc_nodes[0], 'out_file', bet, 'input_file')
     workflow.connect(bet, 'out_file', seg, 't1')
     workflow.connect(apply_mask_nodes[0], 'out_file', seg, 't1c')
