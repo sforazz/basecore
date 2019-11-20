@@ -19,6 +19,11 @@ if __name__ == "__main__":
                         help=('Exisisting directory with the subject(s) to process'))
     PARSER.add_argument('--work_dir', '-w', type=str,
                         help=('Directory where to store the results.'))
+    PARSER.add_argument('--clean-cache', '-c', action='store_true',
+                        help=('To remove all the intermediate files. Enable this only '
+                              'when you are sure that the workflow is running properly '
+                              'otherwise it will always restart from scratch. '
+                              'Default False.'))
 
     ARGS = PARSER.parse_args()
 
@@ -26,6 +31,7 @@ if __name__ == "__main__":
     WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
     NIPYPE_CACHE = os.path.join(ARGS.work_dir, 'nipype_cache')
     RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
+    CLEAN_CACHE = ARGS.clean_cache
 
     sequences = ['t1', 'ct1', 't2', 'flair']
     sub_list = os.listdir(BASE_DIR)
@@ -134,6 +140,8 @@ if __name__ == "__main__":
 
     workflow.run()
     # workflow.run('MultiProc', plugin_args={'n_procs': 8})
-    shutil.rmtree(WORKFLOW_CACHE)
+    if CLEAN_CACHE:
+        shutil.rmtree(WORKFLOW_CACHE)
+        shutil.rmtree(NIPYPE_CACHE)
 
     print('Done!')
