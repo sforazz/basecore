@@ -31,7 +31,7 @@ if __name__ == "__main__":
     sub_list = os.listdir(BASE_DIR)
 
     if not os.path.isdir(WORKFLOW_CACHE):
-        os.mkdir(WORKFLOW_CACHE)
+        os.makedirs(WORKFLOW_CACHE)
 
     datasource = nipype.Node(
         interface=nipype.DataGrabber(infields=['subjects'], outfields=['t1', 'ct1', 't2', 'flair']),
