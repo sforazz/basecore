@@ -95,6 +95,9 @@ Optional arguments:
 
      -z:  collapse output transforms (default = 1)
 
+     -l:  Interpolation. Possible values are: Linear (default), NearestNeighbor, BSpline,
+	  CosineWindowedSinc, WelchWindowedSinc, HammingWindowedSinc.
+
      NB:  Multiple image pairs can be specified for registration during the SyN stage.
           Specify additional images using the '-m' and '-f' options.  Note that image
           pair correspondence is given by the order specified on the command line.
@@ -176,6 +179,9 @@ Optional arguments:
      -z:  collapse output transforms (default = 1)
 
      -e:  Fix random seed to an int value (default = system time)
+
+     -l:  Interpolation. Possible values are: Linear (default), NearestNeighbor, BSpline,
+	  CosineWindowedSinc, WelchWindowedSinc, HammingWindowedSinc.
 
      NB:  Multiple image pairs can be specified for registration during the SyN stage.
           Specify additional images using the '-m' and '-f' options.  Note that image
@@ -280,6 +286,7 @@ NUMBEROFTHREADS=0
 SPLINEDISTANCE=26
 TRANSFORMTYPE='s'
 PRECISIONTYPE='d'
+INTERPOLATION='Linear'
 CCRADIUS=4
 MASKIMAGES=()
 USEHISTOGRAMMATCHING=0

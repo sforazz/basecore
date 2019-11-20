@@ -128,9 +128,9 @@ if __name__ == "__main__":
     workflow.connect(apply_mask_nodes[1], 'out_file', seg, 't2')
     workflow.connect(apply_mask_nodes[2], 'out_file', seg, 'flair')
     workflow.connect(bet, 'out_file', datasink,
-                     'tumor_seg_preproc.@T1_preproc')
+                     'results.@T1_preproc')
     workflow.connect(seg, 'out_file', datasink,
-                     'tumor_seg_preproc.@segmentation')
+                     'results.@segmentation')
 
     workflow.run()
     # workflow.run('MultiProc', plugin_args={'n_procs': 8})
