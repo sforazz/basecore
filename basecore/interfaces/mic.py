@@ -123,10 +123,10 @@ class HDGlioPredict(CommandLine):
 
         out_file = self.inputs.out_file
         if isdefined(out_file) and isdefined(self.inputs.t1):
-            _, _, ext = split_filename(self.inputs.input_file)
+            _, _, ext = split_filename(self.inputs.t1)
             out_file = self.inputs.out_file+ext
-        if not isdefined(out_file) and isdefined(self.inputs.input_file):
-            pth, _, ext = split_filename(self.inputs.input_file)
+        if not isdefined(out_file) and isdefined(self.inputs.t1):
+            pth, _, ext = split_filename(self.inputs.t1)
             print(pth, ext)
             out_file = os.path.join(pth, 'segmentation'+ext)
 
