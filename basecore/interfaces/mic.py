@@ -5,6 +5,7 @@ import os
 from nipype.interfaces.base import isdefined
 from basecore.utils.filemanip import split_filename
 from nnunet.inference.predict import predict_from_folder
+import torch
 
 
 class HDBetInputSpec(CommandLineInputSpec):
@@ -255,6 +256,8 @@ class NNUnetInference(BaseInterface):
                             save_npz, num_threads_preprocessing, num_threads_nifti_save,
                             lowres_segmentations, part_id, num_parts, tta,
                             overwrite_existing=overwrite)
+        torch.cuda.empty_cache()
+
         return runtime
 
     def _list_outputs(self):
