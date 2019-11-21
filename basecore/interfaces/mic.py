@@ -1,8 +1,10 @@
 from nipype.interfaces.base import (
-    TraitedSpec, traits, File, CommandLineInputSpec, CommandLine)
+    TraitedSpec, traits, File, CommandLineInputSpec, CommandLine,
+    BaseInterfaceInputSpec, Directory, BaseInterface)
 import os
 from nipype.interfaces.base import isdefined
 from basecore.utils.filemanip import split_filename
+from nnunet.inference.predict import predict_from_folder
 
 
 class HDBetInputSpec(CommandLineInputSpec):
@@ -131,3 +133,132 @@ class HDGlioPredict(CommandLine):
             out_file = os.path.join(pth, 'segmentation'+ext)
 
         return os.path.abspath(out_file)
+
+
+class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
+
+    input_folder = Directory(exist=True, mandatory=True,
+                             desc='Input directory')
+    output_folder = traits.Str('nnunet_inference', usedefault=True,
+                                desc='Output directory')
+    model_folder = Directory(mandatory=True, exist=True,
+                             desc='Folder with the results of the nnUnet'
+                             'training.')
+    folds = traits.Int(default='None', usedefault=True,
+                       desc="folds to use for prediction. Default is None "
+                            "which means that folds will be detected "
+                            "automatically in the model output folder")
+    save_npz = traits.Bool(default=False, usedefault=True,
+                           desc="use this if you want to ensemble"
+                                " these predictions with those of"
+                                " other models. Softmax "
+                                "probabilities will be saved as "
+                                "compresed numpy arrays in "
+                                "output_folder and can be merged "
+                                "between output_folders with "
+                                "merge_predictions.py")
+    lowres_segmentations = Directory(
+        default=None, usedefault=True,
+        desc="if model is the highres stage of the cascade then you need to use "
+             "-l to specify where the segmentations of the corresponding lowres "
+             "unet are. Here they are required to do a prediction")
+    part_id = traits.Int(default=0, usedefault=True,
+                         desc="Used to parallelize the prediction of "
+                              "the folder over several GPUs. If you "
+                              "want to use n GPUs to predict this "
+                              "folder you need to run this command "
+                              "n times with --part_id=0, ... n-1 and "
+                              "--num_parts=n (each with a different "
+                              "GPU (for example via "
+                              "CUDA_VISIBLE_DEVICES=X)")
+    num_parts = traits.Int(default=1, usedefault=True,
+                           desc="Used to parallelize the prediction of "
+                                "the folder over several GPUs. If you "
+                                "want to use n GPUs to predict this "
+                                "folder you need to run this command "
+                                "n times with --part_id=0, ... n-1 and "
+                                "--num_parts=n (each with a different "
+                                "GPU (for example via "
+                                "CUDA_VISIBLE_DEVICES=X)")
+    threads_preprocessing = traits.Int(
+        default=6, usedefault=True,
+        desc="Determines many background processes will be used for data "
+             "preprocessing. Reduce this if you run into out of memory "
+             "(RAM) problems. Default: 6")
+    threads_save = traits.Int(
+        default=2, usedefault=True,
+        desc="Determines many background processes will be used for segmentation "
+             "export. Reduce this if you run into out of memory "
+             "(RAM) problems. Default: 2")
+    tta = traits.Int(default=1, usedefault=True,
+                     desc="Set to 0 to disable test time data augmentation "
+                     "(speedup of factor 4(2D)/8(3D)), lower quality segmentations")
+    overwrite = traits.Int(
+        default=1, usedefault=True,
+        desc="Set this to 0 if you need to resume a previous prediction. Default: 1 "
+             "(=existing segmentations in output_folder will be overwritten)")
+
+
+class NNUnetInferenceOutputSpec(TraitedSpec):
+
+    output_folder = traits.Str(exist=True, desc='Output directory')
+
+
+class NNUnetInference(BaseInterface):
+
+    input_spec = NNUnetInferenceInputSpec
+    output_spec = NNUnetInferenceOutputSpec
+
+    def _run_interface(self, runtime):
+
+        input_folder = self.inputs.input_folder
+        output_folder = os.path.abspath(self.inputs.output_folder)
+        part_id = self.inputs.part_id
+        num_parts = self.inputs.num_parts
+        folds = self.inputs.folds
+        save_npz = self.inputs.save_npz
+        lowres_segmentations = self.inputs.lowres_segmentations
+        num_threads_preprocessing = self.inputs.threads_preprocessing
+        num_threads_nifti_save = self.inputs.threads_save
+        tta = self.inputs.tta
+        overwrite = self.inputs.overwrite
+        model_folder = self.inputs.model_folder
+
+        if lowres_segmentations == "None":
+            lowres_segmentations = None
+
+        if isinstance(folds, list):
+            if folds[0] == 'all' and len(folds) == 1:
+                pass
+            else:
+                folds = [int(i) for i in folds]
+        elif folds == "None":
+            folds = None
+        else:
+            raise ValueError("Unexpected value for argument folds")
+
+        if tta == 0:
+            tta = False
+        elif tta == 1:
+            tta = True
+        else:
+            raise ValueError("Unexpected value for tta, Use 1 or 0")
+
+        if overwrite == 0:
+            overwrite = False
+        elif overwrite == 1:
+            overwrite = True
+        else:
+            raise ValueError("Unexpected value for overwrite, Use 1 or 0")
+
+        predict_from_folder(model_folder, input_folder, output_folder, folds,
+                            save_npz, num_threads_preprocessing, num_threads_nifti_save,
+                            lowres_segmentations, part_id, num_parts, tta,
+                            overwrite_existing=overwrite)
+        return runtime
+
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['output_folder'] = os.path.abspath(self.inputs.output_folder)
+
+        return outputs

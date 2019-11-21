@@ -5,8 +5,10 @@ import shutil
 import nipype
 from nipype.interfaces.fsl.maths import ApplyMask
 from nipype.interfaces.dcm2nii import Dcm2niix
-from basecore.interfaces.utils import DicomCheck, ConversionCheck
-from basecore.interfaces.mic import HDBet, HDGlioPredict
+from nipype.interfaces.utility import Merge
+from basecore.interfaces.utils import DicomCheck, ConversionCheck,\
+    NNUnetPreparation
+from basecore.interfaces.mic import HDBet, HDGlioPredict, NNUnetInference
 from basecore.interfaces.ants import AntsRegSyn
 
 
@@ -19,6 +21,8 @@ if __name__ == "__main__":
                         help=('Exisisting directory with the subject(s) to process'))
     PARSER.add_argument('--work_dir', '-w', type=str,
                         help=('Directory where to store the results.'))
+    PARSER.add_argument('--model_dir', '-md', type=str,
+                        help=('Directory with the model parameters, trained with nnUNet.'))
     PARSER.add_argument('--clean-cache', '-c', action='store_true',
                         help=('To remove all the intermediate files. Enable this only '
                               'when you are sure that the workflow is running properly '
@@ -91,9 +95,20 @@ if __name__ == "__main__":
                                  name='masking{}'.format(i))
         apply_mask_nodes.append(masking)
 
-    seg  = nipype.MapNode(interface=HDGlioPredict(), iterfield=['t1', 't1c', 't2', 'flair'],
-                          name='segmentation')
-    seg.inputs.out_file = 'segmentation'
+    tumor_seg  = nipype.MapNode(interface=HDGlioPredict(), iterfield=['t1', 't1c', 't2', 'flair'],
+                                name='tumor_segmentation')
+    tumor_seg.inputs.out_file = 'segmentation'
+
+    mi = nipype.MapNode(Merge(2), iterfield=['in1', 'in2'],
+                        name='merge')
+
+    gtv_seg_data_prep = nipype.MapNode(interface=NNUnetPreparation(),
+                                       iterfield=['images'],
+                                       name='gtv_seg_data_prep')
+
+    gtv_seg = nipype.MapNode(interface=NNUnetInference(), iterfield=['input_folder'],
+                             name='gtv_segmentation')
+    gtv_seg.inputs.model_folder = ARGS.model_dir
 
     datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
     substitutions = [('T1_bet.nii.gz', 'T1_preproc.nii.gz')]
@@ -129,14 +144,21 @@ if __name__ == "__main__":
         workflow.connect(mask, 'out_file', datasink,
                          'results.@{}_preproc'.format(sequences[i+1]))
     workflow.connect(cc_nodes[0], 'out_file', bet, 'input_file')
-    workflow.connect(bet, 'out_file', seg, 't1')
-    workflow.connect(apply_mask_nodes[0], 'out_file', seg, 't1c')
-    workflow.connect(apply_mask_nodes[1], 'out_file', seg, 't2')
-    workflow.connect(apply_mask_nodes[2], 'out_file', seg, 'flair')
+    workflow.connect(bet, 'out_file', tumor_seg, 't1')
+    workflow.connect(apply_mask_nodes[0], 'out_file', tumor_seg, 't1c')
+    workflow.connect(apply_mask_nodes[1], 'out_file', tumor_seg, 't2')
+    workflow.connect(apply_mask_nodes[2], 'out_file', tumor_seg, 'flair')
+    workflow.connect(apply_mask_nodes[0], 'out_file', mi, 'in1')
+    workflow.connect(apply_mask_nodes[2], 'out_file', mi, 'in2')
+    workflow.connect(mi, 'out', gtv_seg_data_prep, 'images')
+    workflow.connect(gtv_seg_data_prep, 'output_folder',
+                     gtv_seg, 'input_folder')
     workflow.connect(bet, 'out_file', datasink,
                      'results.@T1_preproc')
-    workflow.connect(seg, 'out_file', datasink,
-                     'results.@segmentation')
+    workflow.connect(tumor_seg, 'out_file', datasink,
+                     'results.@tumor_seg')
+    workflow.connect(gtv_seg, 'output_folder', datasink,
+                     'results.@gtv_seg')
 
     workflow.run()
     # workflow.run('MultiProc', plugin_args={'n_procs': 8})

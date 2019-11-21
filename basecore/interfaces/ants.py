@@ -85,7 +85,7 @@ class AntsRegSyn(CommandLine):
 
 
 class ResampleImageInputSpec(ANTSCommandInputSpec):
-    
+
     dimensions = traits.Enum(3, 2, argstr='%d', usedefault=True, position=0,
                              desc='image dimension (2 or 3)')
     in_file = File(exists=True, mandatory=True, desc='Image to resample',
