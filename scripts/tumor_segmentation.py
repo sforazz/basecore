@@ -117,7 +117,7 @@ if __name__ == "__main__":
     for i, sub in enumerate(sub_list):
         substitutions += [('_bet{}/'.format(i), sub+'/')]
         substitutions += [('_tumor_segmentation{}/'.format(i), sub+'/')]
-        substitutions += [('_gtv_segmentation{}/nnunet_inference/'.format(i), sub+'/')]
+        substitutions += [('_gtv_segmentation{}/'.format(i), sub+'/')]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            sub+'/'+'CT1_preproc.nii.gz')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
