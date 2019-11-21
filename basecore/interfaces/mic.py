@@ -2,6 +2,7 @@ from nipype.interfaces.base import (
     TraitedSpec, traits, File, CommandLineInputSpec, CommandLine,
     BaseInterfaceInputSpec, Directory, BaseInterface)
 import os
+import glob
 from nipype.interfaces.base import isdefined
 from basecore.utils.filemanip import split_filename
 from nnunet.inference.predict import predict_from_folder
@@ -203,6 +204,8 @@ class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
 class NNUnetInferenceOutputSpec(TraitedSpec):
 
     output_folder = traits.Str(exist=True, desc='Output directory')
+    output_file = File(exists=True, desc='First nifti file inside the'
+                       ' output folder.')
 
 
 class NNUnetInference(BaseInterface):
@@ -263,5 +266,7 @@ class NNUnetInference(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs['output_folder'] = os.path.abspath(self.inputs.output_folder)
+        outputs['output_file'] = sorted(glob.glob(
+            os.path.join(os.path.abspath(self.inputs.output_folder), '*.nii.gz')))[0]
 
         return outputs

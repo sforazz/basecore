@@ -112,12 +112,12 @@ if __name__ == "__main__":
 
     datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
     substitutions = [('T1_bet.nii.gz', 'T1_preproc.nii.gz')]
+    substitutions += [('subject1', 'GTV_predicted')]
+    substitutions += [('/segmentation.nii.gz', '/Tumor_predicted.nii.gz')]
     for i, sub in enumerate(sub_list):
         substitutions += [('_bet{}/'.format(i), sub+'/')]
         substitutions += [('_tumor_segmentation{}/'.format(i), sub+'/')]
-        substitutions += [('_gtv_segmentation{}/'.format(i), sub+'/')]
-        substitutions += [('nnunet_inference/subject1', 'GTV_predicted')]
-        substitutions += [('/segmentation.nii.gz', '/Tumor_predicted.nii.gz')]
+        substitutions += [('_gtv_segmentation{}/nnunet_inference/'.format(i), sub+'/')]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            sub+'/'+'CT1_preproc.nii.gz')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
@@ -160,7 +160,7 @@ if __name__ == "__main__":
                      'results.@T1_preproc')
     workflow.connect(tumor_seg, 'out_file', datasink,
                      'results.@tumor_seg')
-    workflow.connect(gtv_seg, 'output_folder', datasink,
+    workflow.connect(gtv_seg, 'output_file', datasink,
                      'results.@gtv_seg')
 
     workflow.run(plugin='Linear')
