@@ -144,11 +144,11 @@ class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
     model_folder = Directory(mandatory=True, exist=True,
                              desc='Folder with the results of the nnUnet'
                              'training.')
-    folds = traits.Int(default='None', usedefault=True,
+    folds = traits.Int(6, usedefault=True,
                        desc="folds to use for prediction. Default is None "
                             "which means that folds will be detected "
                             "automatically in the model output folder")
-    save_npz = traits.Bool(default=False, usedefault=True,
+    save_npz = traits.Bool(False, usedefault=True,
                            desc="use this if you want to ensemble"
                                 " these predictions with those of"
                                 " other models. Softmax "
@@ -158,11 +158,11 @@ class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
                                 "between output_folders with "
                                 "merge_predictions.py")
     lowres_segmentations = Directory(
-        default=None, usedefault=True,
+        "None", usedefault=True,
         desc="if model is the highres stage of the cascade then you need to use "
              "-l to specify where the segmentations of the corresponding lowres "
              "unet are. Here they are required to do a prediction")
-    part_id = traits.Int(default=0, usedefault=True,
+    part_id = traits.Int(0, usedefault=True,
                          desc="Used to parallelize the prediction of "
                               "the folder over several GPUs. If you "
                               "want to use n GPUs to predict this "
@@ -171,7 +171,7 @@ class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
                               "--num_parts=n (each with a different "
                               "GPU (for example via "
                               "CUDA_VISIBLE_DEVICES=X)")
-    num_parts = traits.Int(default=1, usedefault=True,
+    num_parts = traits.Int(1, usedefault=True,
                            desc="Used to parallelize the prediction of "
                                 "the folder over several GPUs. If you "
                                 "want to use n GPUs to predict this "
@@ -181,20 +181,20 @@ class NNUnetInferenceInputSpec(BaseInterfaceInputSpec):
                                 "GPU (for example via "
                                 "CUDA_VISIBLE_DEVICES=X)")
     threads_preprocessing = traits.Int(
-        default=6, usedefault=True,
+        6, usedefault=True,
         desc="Determines many background processes will be used for data "
              "preprocessing. Reduce this if you run into out of memory "
              "(RAM) problems. Default: 6")
     threads_save = traits.Int(
-        default=2, usedefault=True,
+        2, usedefault=True,
         desc="Determines many background processes will be used for segmentation "
              "export. Reduce this if you run into out of memory "
              "(RAM) problems. Default: 2")
-    tta = traits.Int(default=1, usedefault=True,
+    tta = traits.Int(1, usedefault=True,
                      desc="Set to 0 to disable test time data augmentation "
                      "(speedup of factor 4(2D)/8(3D)), lower quality segmentations")
     overwrite = traits.Int(
-        default=1, usedefault=True,
+        1, usedefault=True,
         desc="Set this to 0 if you need to resume a previous prediction. Default: 1 "
              "(=existing segmentations in output_folder will be overwritten)")
 
@@ -232,7 +232,7 @@ class NNUnetInference(BaseInterface):
                 pass
             else:
                 folds = [int(i) for i in folds]
-        elif folds == "None":
+        elif folds == 6:
             folds = None
         else:
             raise ValueError("Unexpected value for argument folds")

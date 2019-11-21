@@ -10,6 +10,7 @@ import shutil
 import os
 import nibabel as nib
 import glob
+from basecore.utils.filemanip import split_filename
 
 
 RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
@@ -306,8 +307,9 @@ class NNUnetPreparation(BaseInterface):
             new_dir = os.path.abspath('data_prepared')
             os.mkdir(os.path.abspath('data_prepared'))
             for i, image in enumerate(images):
+                _, _, ext = split_filename(image)
                 shutil.copy2(image, os.path.join(
-                    new_dir,'subject1_{}'.format(str(i).zfill(4))))
+                    new_dir,'subject1_{}'.format(str(i).zfill(4))+ext))
         else:
             raise Exception('No images provided!Please check.')
 
