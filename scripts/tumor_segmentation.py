@@ -116,6 +116,8 @@ if __name__ == "__main__":
         substitutions += [('_bet{}/'.format(i), sub+'/')]
         substitutions += [('_tumor_segmentation{}/'.format(i), sub+'/')]
         substitutions += [('_gtv_segmentation{}/'.format(i), sub+'/')]
+        substitutions += [('nnunet_inference/subject1', 'GTV_predicted')]
+        substitutions += [('/segmentation.nii.gz', '/Tumor_predicted.nii.gz')]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            sub+'/'+'CT1_preproc.nii.gz')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
