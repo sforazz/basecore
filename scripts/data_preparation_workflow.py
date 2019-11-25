@@ -4,11 +4,12 @@ import nipype.interfaces.utility as util
 from nipype.interfaces.dcm2nii import Dcm2niix
 
 
-contrasts = ['T1KM', 'FLAIR', 'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM']
-rt_files = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
-base_dir = '/media/fsforazz/portable_hdd/data_sorted/test/'
-result_dir = '/mnt/sdb/Cinderella_FU_sorted_all_test2/'
-cache_dir = '/mnt/sdb/sorted_data/sorting_cache2/'
+# contrasts = ['T1KM', 'FLAIR', 'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM']
+contrasts = ['T1', 'FLAIR', 'CT1', 'T2', 'CT']
+rt_files = ['RTCT', 'RTSTRUCT', 'RTDOSE', 'RTPLAN']
+base_dir = '/mnt/sdb/test_tumor_seg_4seq/GBM_4sequences/test'
+result_dir = '/mnt/sdb/test_tumor_seg_4seq/GBM_4sequences/test_out'
+cache_dir = '/mnt/sdb/test_tumor_seg_4seq/GBM_4sequences/cache'
 
 inputnode = nipype.Node(
     interface=util.IdentityInterface(fields=['contrasts']),
@@ -17,11 +18,11 @@ inputnode.iterables = ('contrasts', contrasts)
 
 datasource = nipype.Node(
     interface=nipype.DataGrabber(infields=['contrasts'], outfields=['directory']),
-    name='datasource')  
+    name='datasource')
 datasource.inputs.base_directory = base_dir
 datasource.inputs.template = '*'
 datasource.inputs.sort_filelist = True
-datasource.inputs.field_template = dict(directory='*/*/%s/1-*')
+datasource.inputs.field_template = dict(directory='*/*/%s')
 
 inputnode_rt = nipype.Node(
     interface=util.IdentityInterface(fields=['rt_files']),
@@ -34,7 +35,7 @@ datasource_rt = nipype.Node(
 datasource_rt.inputs.base_directory = base_dir
 datasource_rt.inputs.template = '*'
 datasource_rt.inputs.sort_filelist = True
-datasource_rt.inputs.field_template = dict(directory='*/*/%s/1-*')
+datasource_rt.inputs.field_template = dict(directory='*/RT_*/%s')
 
 dc_rt = nipype.MapNode(interface=DicomCheck(), iterfield=['dicom_dir'], name='dc_rt')
 dc_rt.inputs.working_dir = result_dir
@@ -64,7 +65,7 @@ workflow.connect(dc, 'base_dir', converter, 'output_dir')
 workflow.connect(dc, 'scan_name', check, 'file_name')
 workflow.connect(converter, 'converted_files', check, 'in_file')
 
-# workflow.run()
-workflow.run('MultiProc', plugin_args={'n_procs': 8})
+workflow.run()
+# workflow.run('MultiProc', plugin_args={'n_procs': 8})
 
 print('Done!')

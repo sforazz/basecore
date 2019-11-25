@@ -13,7 +13,10 @@ import glob
 from basecore.utils.filemanip import split_filename
 
 
-RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
+RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
+POSSIBLE_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'T1KM', 'FLAIR',
+                  'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM', 'CT1',
+                  'RTCT']
 
 
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
@@ -39,29 +42,41 @@ class DicomCheck(BaseInterface):
         dicom_dir = self.inputs.dicom_dir
         wd = self.inputs.working_dir
 
-        sub_name = dicom_dir.split('/')[-2]
+        img_paths = dicom_dir.split('/')
+        scan_name = list(set(POSSIBLE_NAMES).intersection(img_paths))[0]
+        name_index = img_paths.index(scan_name)
+        tp = img_paths[name_index-1]
+        sub_name = img_paths[name_index-2]
 #         tp = dicom_dir.split('/')[-3]
-        tp = ''
-        scan_name = dicom_dir.split('/')[-1]
+#         tp = ''
+#         scan_name = dicom_dir.split('/')[-1]
         if scan_name in RT_NAMES:
-            dicoms = sorted(glob.glob(dicom_dir+'/*.dcm'))
-            if scan_name == 'RTDOSE':
-                dose_type = dicom_dir.split('/')[-1].split('_')[0][2:]
-                scan_name = scan_name+'/'+dose_type
-        else:
-            dicoms, im_types, series_nums = self.dcm_info()
-            dicoms = self.dcm_check(dicoms, im_types, series_nums)
-        if dicoms:
             if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
             else:
                 shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
-            for d in dicoms:
-                shutil.copy2(d, os.path.join(wd, sub_name, tp, scan_name))
-            self.outdir = os.path.join(wd, sub_name, tp, scan_name)
-            self.scan_name = scan_name
-            self.base_dir = os.path.join(wd, sub_name, tp)
+            files = sorted(os.listdir(dicom_dir))
+            for item in files:
+                curr_item = os.path.join(dicom_dir, item)
+                if os.path.isdir(curr_item):
+                    shutil.copytree(curr_item, os.path.join(wd, sub_name, tp, scan_name, item))
+                else:
+                    shutil.copy2(curr_item, os.path.join(wd, sub_name, tp, scan_name))
+        else:
+            dicoms, im_types, series_nums = self.dcm_info()
+            dicoms = self.dcm_check(dicoms, im_types, series_nums)
+            if dicoms:
+                if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
+                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                else:
+                    shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
+                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                for d in dicoms:
+                    shutil.copy2(d, os.path.join(wd, sub_name, tp, scan_name))
+        self.outdir = os.path.join(wd, sub_name, tp, scan_name)
+        self.scan_name = scan_name
+        self.base_dir = os.path.join(wd, sub_name, tp)
         return runtime
 
     def _list_outputs(self):
@@ -71,7 +86,7 @@ class DicomCheck(BaseInterface):
         outputs['base_dir'] = self.base_dir
 
         return outputs
-    
+
     def dcm_info(self):
         """Function to extract information from a list of DICOM files in one folder. It returns a list of
         unique image types and scan numbers found in the input list of DICOMS.
@@ -122,9 +137,9 @@ class DicomCheck(BaseInterface):
         if toRemove:
             for f in toRemove:
                 dicoms.remove(f)
-        
+
         return dicoms, list(set(ImageTypes)), list(set(SeriesNums))
-    
+
     def dcm_check(self, dicoms, im_types, series_nums):
         """Function to check the DICOM files in one folder. It is based on the glioma test data.
         This function checks the type of the image (to exclude those that are localizer acquisitions)
