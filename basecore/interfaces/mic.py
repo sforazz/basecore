@@ -97,7 +97,7 @@ class HDGlioPredictInputSpec(CommandLineInputSpec):
 
     t1 = traits.File(mandatory=True, exists=True, argstr='-t1 %s',
                      desc='T1 weighted image')
-    t1c = traits.File(mandatory=True, exists=True, argstr='-t1c %s',
+    ct1 = traits.File(mandatory=True, exists=True, argstr='-t1c %s',
                       desc='T1 weighted image')
     t2 = traits.File(mandatory=True, exists=True, argstr='-t2 %s',
                      desc='T1 weighted image')
