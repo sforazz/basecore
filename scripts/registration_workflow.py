@@ -84,8 +84,15 @@ def build_registration_workflow(sub_id, datasource, sessions,
     substitutions += [('subid', sub_id)]
     for i, session in enumerate(sessions):
         substitutions += [('_bet{}/'.format(i), session+'/')]
+        substitutions += [('session{}'.format(i), session)]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'CT1_preproc.nii.gz')]
+        substitutions += [('_reg2T1{}/antsreg0GenericAffine.mat'.format(i),
+                           session+'/'+'reg2T1_ref.mat')]
+        substitutions += [('_reg2T1{}/antsreg1Warp.nii.gz'.format(i),
+                           session+'/'+'reg2T1_ref_warp.nii.gz')]
+        substitutions += [('_regT12CT{}/antsreg0GenericAffine.mat'.format(i),
+                           session+'/'+'regT1_ref2CT.mat')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'T2_preproc.nii.gz')]
         substitutions += [('_masking2{}/antsregWarped_masked.nii.gz'.format(i),
@@ -141,12 +148,28 @@ def build_registration_workflow(sub_id, datasource, sessions,
     workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in3')
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in2')
     workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
+    workflow.connect(regT12CT, 'regmat', datasink,
+                     'results.subid.@regT12CT_mat')
+    workflow.connect(reg2T1, 'warp_file', datasink,
+                     'results.subid.@reg2CT_warp')
+    workflow.connect(reg2T1, 'regmat', datasink,
+                     'results.subid.@reg2CT_mat')
     workflow.connect(apply_ts_t1, 'output_image', datasink,
                      'results.subid.@T1_reg2CT')
     workflow.connect(bet, 'out_file', datasink,
                      'results.subid.@T1_preproc')
     workflow.connect(datasource, 'reference', datasink,
                      'results.subid.@ref_ct')
+    workflow.connect(datasource, 'ct1', datasink,
+                     'results.subid.session.@ct1')
+    workflow.connect(datasource, 't1', datasink,
+                     'results.subid.session.@t1')
+    workflow.connect(datasource, 't2', datasink,
+                     'results.subid.session.@t2')
+    workflow.connect(datasource, 'flair', datasink,
+                     'results.subid.session.@flair')
+    workflow.connect(datasource, 't1_0', datasink,
+                     'results.subid.@ref_t1')
 
     return workflow
 
@@ -169,7 +192,7 @@ if __name__ == "__main__":
     BASE_DIR = ARGS.input_dir
     WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
     NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
-    RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
+    RESULT_DIR = os.path.join(ARGS.work_dir, 'registration_results')
     CLEAN_CACHE = ARGS.clean_cache
 
     
