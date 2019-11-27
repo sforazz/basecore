@@ -84,7 +84,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
     substitutions += [('subid', sub_id)]
     for i, session in enumerate(sessions):
         substitutions += [('_bet{}/'.format(i), session+'/')]
-        substitutions += [('session{}'.format(i), session)]
+        substitutions += [('session'.format(i), session)]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'CT1_preproc.nii.gz')]
         substitutions += [('_reg2T1{}/antsreg0GenericAffine.mat'.format(i),
@@ -159,7 +159,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
     workflow.connect(bet, 'out_file', datasink,
                      'results.subid.@T1_preproc')
     workflow.connect(datasource, 'reference', datasink,
-                     'results.subid.@ref_ct')
+                     'results.subid.REF.@ref_ct')
     workflow.connect(datasource, 'ct1', datasink,
                      'results.subid.session.@ct1')
     workflow.connect(datasource, 't1', datasink,
@@ -169,7 +169,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
     workflow.connect(datasource, 'flair', datasink,
                      'results.subid.session.@flair')
     workflow.connect(datasource, 't1_0', datasink,
-                     'results.subid.@ref_t1')
+                     'results.subid.T10.@ref_t1')
 
     return workflow
 

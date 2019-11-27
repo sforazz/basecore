@@ -40,7 +40,8 @@ def gbm_datasource(sub_id, BASE_DIR):
 def segmentation_datasource(sub_id, BASE_DIR):
 
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
-                if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
+                if 'REF' not in x and 'T10' not in x and 'RT_' not in x
+                and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],

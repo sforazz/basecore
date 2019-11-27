@@ -169,7 +169,11 @@ if __name__ == "__main__":
 
     ARGS = PARSER.parse_args()
 
-    BASE_DIR = ARGS.input_dir
+    if ARGS.run_registration:
+        BASE_DIR = ARGS.input_dir
+    else:
+        BASE_DIR = os.path.join(ARGS.work_dir, 'registration_results',
+                                'results')
     WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
     NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
     RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
@@ -186,15 +190,15 @@ if __name__ == "__main__":
             datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
         else:
             datasource, sessions = segmentation_datasource(
-                sub_id,os.path.join(ARGS.work_dir, 'registration_results', 'results'))
+                sub_id, os.path.join(ARGS.work_dir, 'registration_results', 'results'))
         if ARGS.run_registration:
             reg_workflow = build_registration_workflow(
                 sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
         else:
             reg_workflow = None
         seg_workflow = build_segmentation_workflow(
-            reg_workflow=reg_workflow, datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
-            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE)
+            datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
+            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reg_workflow=reg_workflow)
         seg_workflow.run(plugin='Linear')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)
