@@ -5,7 +5,7 @@ import shutil
 import nipype
 from nipype.interfaces.fsl.maths import ApplyMask
 from nipype.interfaces.ants import ApplyTransforms
-from nipype.interfaces.utility import Merge
+from nipype.interfaces.utility import Merge, Split
 from basecore.interfaces.mic import HDBet
 from basecore.interfaces.ants import AntsRegSyn
 from scripts.datasource_workflow import gbm_datasource
@@ -58,6 +58,12 @@ def build_registration_workflow(sub_id, datasource, sessions,
                                   name='apply_ts{}'.format(i))
         apply_ts_nodes.append(apply_ts)
 
+    split_ds_nodes = []
+    for i in range(4):
+        split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))
+        split_ds.inputs.splits = [1]*len(sessions)
+        split_ds_nodes.append(split_ds)
+
     apply_ts_t1 = nipype.MapNode(interface=ApplyTransforms(),
                                  iterfield=['input_image', 'transforms'],
                                  name='apply_ts_t1')
@@ -83,6 +89,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
 
     substitutions += [('subid', sub_id)]
     for i, session in enumerate(sessions):
+        
         substitutions += [('_bet{}/'.format(i), session+'/')]
         substitutions += [('session'.format(i), session)]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
@@ -92,7 +99,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
         substitutions += [('_reg2T1{}/antsreg1Warp.nii.gz'.format(i),
                            session+'/'+'reg2T1_ref_warp.nii.gz')]
         substitutions += [('_regT12CT{}/antsreg0GenericAffine.mat'.format(i),
-                           session+'/'+'regT1_ref2CT.mat')]
+                           '/regT1_ref2CT.mat')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'T2_preproc.nii.gz')]
         substitutions += [('_masking2{}/antsregWarped_masked.nii.gz'.format(i),
@@ -148,8 +155,9 @@ def build_registration_workflow(sub_id, datasource, sessions,
     workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in3')
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in2')
     workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
-    workflow.connect(regT12CT, 'regmat', datasink,
-                     'results.subid.@regT12CT_mat')
+    for _, sess in enumerate(sessions):
+        workflow.connect(regT12CT, 'regmat', datasink,
+                         'results.subid.{0}.@regT12CT_mat'.format(sess))
     workflow.connect(reg2T1, 'warp_file', datasink,
                      'results.subid.@reg2CT_warp')
     workflow.connect(reg2T1, 'regmat', datasink,
@@ -158,16 +166,22 @@ def build_registration_workflow(sub_id, datasource, sessions,
                      'results.subid.@T1_reg2CT')
     workflow.connect(bet, 'out_file', datasink,
                      'results.subid.@T1_preproc')
+    for i, node in enumerate(split_ds_nodes):
+        workflow.connect(datasource, sequences[i], node,
+                         'inlist')
+        for j, sess in enumerate(sessions):
+            workflow.connect(node, 'out{}'.format(j+1),
+                             datasink, 'results.subid.{0}.@{1}'.format(sess, sequences[i]))
     workflow.connect(datasource, 'reference', datasink,
                      'results.subid.REF.@ref_ct')
-    workflow.connect(datasource, 'ct1', datasink,
-                     'results.subid.session.@ct1')
-    workflow.connect(datasource, 't1', datasink,
-                     'results.subid.session.@t1')
-    workflow.connect(datasource, 't2', datasink,
-                     'results.subid.session.@t2')
-    workflow.connect(datasource, 'flair', datasink,
-                     'results.subid.session.@flair')
+#     workflow.connect(datasource, 'ct1', datasink,
+#                      'results.subid.session.@ct1')
+#     workflow.connect(datasource, 't1', datasink,
+#                      'results.subid.session.@t1')
+#     workflow.connect(datasource, 't2', datasink,
+#                      'results.subid.session.@t2')
+#     workflow.connect(datasource, 'flair', datasink,
+#                      'results.subid.session.@flair')
     workflow.connect(datasource, 't1_0', datasink,
                      'results.subid.T10.@ref_t1')
 
