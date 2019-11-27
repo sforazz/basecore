@@ -6,11 +6,11 @@ from nipype.interfaces.utility import Merge
 from basecore.interfaces.utils import NNUnetPreparation
 from basecore.interfaces.mic import HDGlioPredict, NNUnetInference
 from nipype.interfaces.ants import ApplyTransforms
-from scripts.registration_workflow_new import build_registration_workflow
+from scripts.registration_workflow import build_registration_workflow
 from scripts.datasource_workflow import gbm_datasource
 
 
-def build_segmentation_workflow(reg_workflow, sub_id, sessions, gtv_model,
+def build_segmentation_workflow(reg_workflow, datasource, sub_id, sessions, gtv_model,
                                 tumor_model, result_dir, nipype_cache):
 
     merge_ts_t1 = nipype.MapNode(interface=Merge(3),
@@ -82,12 +82,17 @@ def build_segmentation_workflow(reg_workflow, sub_id, sessions, gtv_model,
     # Connect other nodes
     workflow.connect(gtv_seg, 'output_file', apply_ts_gtv, 'input_image')
     workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_gtv, 'transforms')
+    workflow.connect(datasource, 'reference', apply_ts_gtv,
+                     'reference_image')
     workflow.connect(tumor_seg_2mods, 'output_file', apply_ts_tumor1,
                      'input_image')
     workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor1, 'transforms')
+    workflow.connect(datasource, 'reference', apply_ts_tumor1,
+                     'reference_image')
     workflow.connect(tumor_seg, 'out_file', apply_ts_tumor, 'input_image')
     workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor, 'transforms')
-
+    workflow.connect(datasource, 'reference', apply_ts_tumor,
+                         'reference_image')
     workflow.connect(mi, 'out', gtv_seg_data_prep, 'images')
     workflow.connect(gtv_seg_data_prep, 'output_folder',
                      gtv_seg, 'input_folder')
@@ -146,7 +151,7 @@ if __name__ == "__main__":
         reg_workflow = build_registration_workflow(
             sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
         seg_workflow = build_segmentation_workflow(
-            reg_workflow, sub_id, sessions, ARGS.gtv_seg_model_dir,
+            reg_workflow, datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
             ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE)
         seg_workflow.run(plugin='Linear')
         if CLEAN_CACHE:
