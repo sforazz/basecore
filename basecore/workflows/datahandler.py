@@ -1,10 +1,9 @@
 import os
-import argparse
 import nipype
 from nipype.interfaces.utility import Split
 
 
-sequences = ['t1', 'ct1', 't2', 'flair']
+SEQUENCES = ['t1', 'ct1', 't2', 'flair']
 
 
 def gbm_datasource(sub_id, BASE_DIR):
@@ -129,7 +128,7 @@ def segmentation_datasource(sub_id, BASE_DIR):
 def datasink_base(datasink, datasource, workflow, sessions):
 
     split_ds_nodes = []
-    for i in range(len(sequences)):
+    for i in range(len(SEQUENCES)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))
         split_ds.inputs.splits = [1]*len(sessions)
         split_ds_nodes.append(split_ds)
@@ -137,40 +136,19 @@ def datasink_base(datasink, datasource, workflow, sessions):
 
     for i, node in enumerate(split_ds_nodes):
         if len(sessions) > 1:
-            workflow.connect(datasource, sequences[i], node,
+            workflow.connect(datasource, SEQUENCES[i], node,
                              'inlist')
             for j, sess in enumerate(sessions):
                 workflow.connect(node, 'out{}'.format(j+1),
                                  datasink, 'results.subid.{0}.@{1}'
-                                 .format(sess, sequences[i]))
+                                 .format(sess, SEQUENCES[i]))
         else:
-            workflow.connect(datasource, sequences[i], datasink,
+            workflow.connect(datasource, SEQUENCES[i], datasink,
                              'results.subid.{0}.@{1}'.format(sessions[0],
-                                                             sequences[i]))
+                                                             SEQUENCES[i]))
     workflow.connect(datasource, 'reference', datasink,
                      'results.subid.REF.@ref_ct')
 
     workflow.connect(datasource, 't1_0', datasink,
                      'results.subid.T10.@ref_t1')
     return workflow
-
-
-if __name__ == "__main__":
-
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument('--input_dir', '-i', type=str,
-                        help=('Exisisting directory with the subject(s) to process'))
-
-    ARGS = PARSER.parse_args()
-
-    BASE_DIR = ARGS.input_dir
-
-    
-    sub_list = os.listdir(BASE_DIR)
-
-    for sub_id in sub_list:
-        datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
-        datasource.run()
-
-    print('Done!')

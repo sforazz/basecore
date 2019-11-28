@@ -1,17 +1,13 @@
-import os
-import argparse
-import shutil
+"Segmentation workflows"
 import nipype
 from nipype.interfaces.utility import Merge
 from basecore.interfaces.utils import NNUnetPreparation
 from basecore.interfaces.mic import HDGlioPredict, NNUnetInference
 from nipype.interfaces.ants import ApplyTransforms
-from scripts.registration_workflow import build_registration_workflow
-from scripts.datasource_workflow import gbm_datasource, segmentation_datasource
 
 
-def build_segmentation_workflow(datasource, sub_id, sessions, gtv_model,
-                                tumor_model, result_dir, nipype_cache, reg_workflow=None):
+def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
+                       tumor_model, result_dir, nipype_cache, reg_workflow=None):
 
     if reg_workflow is None:
         merge_ts_t1 = nipype.MapNode(interface=Merge(3),
@@ -144,63 +140,3 @@ def build_segmentation_workflow(datasource, sub_id, sessions, gtv_model,
                      'results.subid.@tumor1_reg2CT')
 
     return workflow
-
-
-if __name__ == "__main__":
-
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument('--input_dir', '-i', type=str,
-                        help=('Exisisting directory with the subject(s) to process'))
-    PARSER.add_argument('--work_dir', '-w', type=str,
-                        help=('Directory where to store the results.'))
-    PARSER.add_argument('--run_registration', '-reg', action='store_true',
-                        help=('Whether or not to run registration before segmentation.'
-                              ' Default is False.'))
-    PARSER.add_argument('--gtv_seg_model_dir', '-gtv_md', type=str, default='None',
-                        help=('Directory with the model parameters, trained with nnUNet.'))
-    PARSER.add_argument('--tumor_seg_model_dir', '-tumor_md', type=str, default='None',
-                        help=('Directory with the model parameters, trained with nnUNet.'))
-    PARSER.add_argument('--clean-cache', '-c', action='store_true',
-                        help=('To remove all the intermediate files. Enable this only '
-                              'when you are sure that the workflow is running properly '
-                              'otherwise it will always restart from scratch. '
-                              'Default False.'))
-
-    ARGS = PARSER.parse_args()
-
-    if ARGS.run_registration:
-        BASE_DIR = ARGS.input_dir
-    else:
-        BASE_DIR = os.path.join(ARGS.work_dir, 'registration_results',
-                                'results')
-    WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
-    NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
-    RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
-    CLEAN_CACHE = ARGS.clean_cache
-
-    sub_list = os.listdir(BASE_DIR)
-
-    if not os.path.isdir(WORKFLOW_CACHE):
-        os.makedirs(WORKFLOW_CACHE)
-
-    for sub_id in sub_list:
-        NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        if ARGS.run_registration:
-            datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
-        else:
-            datasource, sessions = segmentation_datasource(
-                sub_id, os.path.join(ARGS.work_dir, 'registration_results', 'results'))
-        if ARGS.run_registration:
-            reg_workflow = build_registration_workflow(
-                sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
-        else:
-            reg_workflow = None
-        seg_workflow = build_segmentation_workflow(
-            datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
-            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reg_workflow=reg_workflow)
-        seg_workflow.run(plugin='Linear')
-        if CLEAN_CACHE:
-            shutil.rmtree(NIPYPE_CACHE)
-
-    print('Done!')

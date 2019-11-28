@@ -1,30 +1,23 @@
-"Script to run the tumor segmentation using HD-GLIO"
-import os
-import argparse
-import shutil
+"Registration workflows"
 import nipype
 from nipype.interfaces.fsl.maths import ApplyMask
 from nipype.interfaces.ants import ApplyTransforms
 from nipype.interfaces.utility import Merge, Split
-from basecore.interfaces.mic import HDBet
 from basecore.interfaces.ants import AntsRegSyn
-from scripts.datasource_workflow import gbm_datasource
+from basecore.workflows.datahandler import SEQUENCES, datasink_base
 
 
-sequences = ['t1', 'ct1', 't2', 'flair']
-
-
-def build_registration_workflow(sub_id, datasource, sessions,
-                                RESULT_DIR, NIPYPE_CACHE):
-
-    bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet')
-    bet.inputs.save_mask = 1
-    bet.inputs.out_file = 'T1_bet'
-
-    bet_t10 = nipype.Node(interface=HDBet(), name='t1_0_bet')
-    bet_t10.inputs.save_mask = 1
-    bet_t10.inputs.out_file = 'T1_0_bet'
-
+def longitudinal_registration(sub_id, datasource, sessions,
+                              RESULT_DIR, NIPYPE_CACHE, bet_workflow=None):
+    """
+    This is a workflow to register multi-modalities MR (T2, T1KM, FLAIR) to their 
+    reference T1 image, in multiple time-points cohort. In particular, for each 
+    subject, this workflow will register the MR images in each time-point (tp)
+    to the corresponding T1, then it will register all the T1 images to a reference T1
+    (the one that is the closest in time to the radiotherapy session), and finally the
+    reference T1 to the BPLCT. At the end, all the MR images will be saved both in T1 space
+    (for each tp) and in CT space.
+    """
     reg2T1 = nipype.MapNode(interface=AntsRegSyn(), iterfield=['input_file'], name='reg2T1')
     reg2T1.inputs.transformation = 's'
     reg2T1.inputs.num_dimensions = 3
@@ -85,12 +78,9 @@ def build_registration_workflow(sub_id, datasource, sessions,
     fake_merge = nipype.Node(interface=Merge(len(sessions)), name='fake_merge')
 
     datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
-    substitutions = [('T1_bet.nii.gz', 'T1_preproc.nii.gz')]
 
-    substitutions += [('subid', sub_id)]
+    substitutions = [('subid', sub_id)]
     for i, session in enumerate(sessions):
-        
-        substitutions += [('_bet{}/'.format(i), session+'/')]
         substitutions += [('session'.format(i), session)]
         substitutions += [('_masking0{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'CT1_preproc.nii.gz')]
@@ -118,15 +108,15 @@ def build_registration_workflow(sub_id, datasource, sessions,
     workflow = nipype.Workflow('registration_workflow', base_dir=NIPYPE_CACHE)
 
     for i, reg in enumerate(reg_nodes):
-        workflow.connect(datasource, sequences[i+1], reg, 'input_file')
-        workflow.connect(datasource, sequences[0], reg, 'ref_file')
+        workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
+        workflow.connect(datasource, SEQUENCES[0], reg, 'ref_file')
 
     for i, node in enumerate(apply_ts_nodes):
-        workflow.connect(datasource, sequences[i+1], node, 'input_image')
+        workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
         workflow.connect(datasource, 'reference', node, 'reference_image')
         workflow.connect(merge_nodes[i], 'out', node, 'transforms')
         workflow.connect(node, 'output_image', datasink,
-                         'results.subid.@{}_reg2CT'.format(sequences[i+1]))
+                         'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
 
     for i in range(len(sessions)):
         workflow.connect(regT12CT, 'regmat', fake_merge, 'in{}'.format(i+1))
@@ -139,13 +129,18 @@ def build_registration_workflow(sub_id, datasource, sessions,
 
     for i, mask in enumerate(apply_mask_nodes):
         workflow.connect(reg_nodes[i], 'reg_file', mask, 'in_file')
-        workflow.connect(bet, 'out_mask', mask, 'mask_file')
+        if bet_workflow is not None:
+            workflow.connect(bet_workflow, 'bet.out_mask', mask, 'mask_file')
+        else:
+            workflow.connect(datasource, 't1_mask', mask, 'mask_file')
         workflow.connect(mask, 'out_file', datasink,
-                         'results.subid.@{}_preproc'.format(sequences[i+1]))
-    workflow.connect(datasource, sequences[0], bet, 'input_file')
-    workflow.connect(datasource, 't1_0', bet_t10, 'input_file')
-    workflow.connect(bet, 'out_file', reg2T1, 'input_file')
-    workflow.connect(bet_t10, 'out_file', reg2T1, 'ref_file')
+                         'results.subid.@{}_preproc'.format(SEQUENCES[i+1]))
+    if bet_workflow is not None:
+        workflow.connect(bet_workflow, 'bet.out_file', reg2T1, 'input_file')
+        workflow.connect(bet_workflow, 't1_0_bet.out_file', reg2T1, 'ref_file')
+    else:
+        workflow.connect(datasource, 't1_bet', reg2T1, 'input_file')
+        workflow.connect(datasource, 't1_0_bet', reg2T1, 'ref_file')
     workflow.connect(datasource, 'reference', regT12CT, 'ref_file')
     workflow.connect(datasource, 't1_0', regT12CT, 'input_file')
     workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
@@ -164,64 +159,7 @@ def build_registration_workflow(sub_id, datasource, sessions,
                      'results.subid.@reg2CT_mat')
     workflow.connect(apply_ts_t1, 'output_image', datasink,
                      'results.subid.@T1_reg2CT')
-    workflow.connect(bet, 'out_file', datasink,
-                     'results.subid.@T1_preproc')
-    for i, node in enumerate(split_ds_nodes):
-        workflow.connect(datasource, sequences[i], node,
-                         'inlist')
-        for j, sess in enumerate(sessions):
-            workflow.connect(node, 'out{}'.format(j+1),
-                             datasink, 'results.subid.{0}.@{1}'.format(sess, sequences[i]))
-    workflow.connect(datasource, 'reference', datasink,
-                     'results.subid.REF.@ref_ct')
-#     workflow.connect(datasource, 'ct1', datasink,
-#                      'results.subid.session.@ct1')
-#     workflow.connect(datasource, 't1', datasink,
-#                      'results.subid.session.@t1')
-#     workflow.connect(datasource, 't2', datasink,
-#                      'results.subid.session.@t2')
-#     workflow.connect(datasource, 'flair', datasink,
-#                      'results.subid.session.@flair')
-    workflow.connect(datasource, 't1_0', datasink,
-                     'results.subid.T10.@ref_t1')
+
+    workflow = datasink_base(datasink, datasource, workflow, sessions)
 
     return workflow
-
-if __name__ == "__main__":
-
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument('--input_dir', '-i', type=str,
-                        help=('Exisisting directory with the subject(s) to process'))
-    PARSER.add_argument('--work_dir', '-w', type=str,
-                        help=('Directory where to store the results.'))
-    PARSER.add_argument('--clean-cache', '-c', action='store_true',
-                        help=('To remove all the intermediate files. Enable this only '
-                              'when you are sure that the workflow is running properly '
-                              'otherwise it will always restart from scratch. '
-                              'Default False.'))
-
-    ARGS = PARSER.parse_args()
-
-    BASE_DIR = ARGS.input_dir
-    WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
-    NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
-    RESULT_DIR = os.path.join(ARGS.work_dir, 'registration_results')
-    CLEAN_CACHE = ARGS.clean_cache
-
-    
-    sub_list = os.listdir(BASE_DIR)
-
-    if not os.path.isdir(WORKFLOW_CACHE):
-        os.makedirs(WORKFLOW_CACHE)
-
-    for sub_id in sub_list:
-        NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
-        workflow = build_registration_workflow(
-            sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
-        workflow.run(plugin='Linear')
-        if CLEAN_CACHE:
-            shutil.rmtree(NIPYPE_CACHE)
-
-    print('Done!')
