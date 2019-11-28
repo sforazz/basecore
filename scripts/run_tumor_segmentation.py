@@ -68,7 +68,8 @@ if __name__ == "__main__":
 
         seg_workflow = tumor_segmentation(
             datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
-            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reg_workflow=reg_workflow)
+            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE,
+            reg_workflow=reg_workflow, bet_workflow=bet_workflow)
 
         seg_workflow.run(plugin='Linear')
         if CLEAN_CACHE:

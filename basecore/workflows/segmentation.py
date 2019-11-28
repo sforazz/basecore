@@ -7,7 +7,8 @@ from nipype.interfaces.ants import ApplyTransforms
 
 
 def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
-                       tumor_model, result_dir, nipype_cache, reg_workflow=None):
+                       tumor_model, result_dir, nipype_cache, reg_workflow=None,
+                       bet_workflow=None):
 
     if reg_workflow is None:
         merge_ts_t1 = nipype.MapNode(interface=Merge(3),
@@ -79,7 +80,7 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(reg_workflow, 'masking0.out_file', tumor_seg, 'ct1')
         workflow.connect(reg_workflow, 'masking1.out_file', tumor_seg, 't2')
         workflow.connect(reg_workflow, 'masking2.out_file', tumor_seg, 'flair')
-        workflow.connect(reg_workflow, 'bet.out_file', tumor_seg, 't1')
+        workflow.connect(bet_workflow, 'bet.out_file', tumor_seg, 't1')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor, 'transforms')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_gtv, 'transforms')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor1, 'transforms')

@@ -40,9 +40,6 @@ if __name__ == "__main__":
                                 'results')
     sub_list = os.listdir(BASE_DIR)
 
-    if not os.path.isdir(WORKFLOW_CACHE):
-        os.makedirs(WORKFLOW_CACHE)
-
     for sub_id in sub_list:
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_bet:

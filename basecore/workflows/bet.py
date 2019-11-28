@@ -9,7 +9,7 @@ def brain_extraction(sub_id, datasource, sessions,
 
     bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet')
     bet.inputs.save_mask = 1
-    bet.inputs.out_file = 'T1_bet'
+    bet.inputs.out_file = 'T1_preproc'
 
     bet_t10 = nipype.Node(interface=HDBet(), name='t1_0_bet')
     bet_t10.inputs.save_mask = 1
