@@ -5,7 +5,7 @@ from basecore.workflows.datahandler import datasink_base
 
 
 def brain_extraction(sub_id, datasource, sessions,
-                                RESULT_DIR, NIPYPE_CACHE):
+                     RESULT_DIR, NIPYPE_CACHE, reference):
 
     bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet')
     bet.inputs.save_mask = 1
@@ -36,6 +36,6 @@ def brain_extraction(sub_id, datasource, sessions,
     workflow.connect(bet_t10, 'out_file', datasink,
                      'results.subid.T10.@T1_ref_bet')
 
-    workflow = datasink_base(datasink, datasource, workflow, sessions)
+    workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
 
     return workflow

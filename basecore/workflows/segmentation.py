@@ -4,11 +4,12 @@ from nipype.interfaces.utility import Merge
 from basecore.interfaces.utils import NNUnetPreparation
 from basecore.interfaces.mic import HDGlioPredict, NNUnetInference
 from nipype.interfaces.ants import ApplyTransforms
+from basecore.workflows.datahandler import datasink_base
 
 
 def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
-                       tumor_model, result_dir, nipype_cache, reg_workflow=None,
-                       bet_workflow=None):
+                       tumor_model, result_dir, nipype_cache, reference,
+                       reg_workflow=None, bet_workflow=None):
 
     if reg_workflow is None:
         merge_ts_t1 = nipype.MapNode(interface=Merge(3),
@@ -139,5 +140,7 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                      'results.subid.@tumor_reg2CT')
     workflow.connect(apply_ts_tumor1, 'output_image', datasink,
                      'results.subid.@tumor1_reg2CT')
+
+    workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
 
     return workflow

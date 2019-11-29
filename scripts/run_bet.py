@@ -33,9 +33,9 @@ if __name__ == "__main__":
 
     for sub_id in sub_list:
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
+        datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
         workflow = brain_extraction(
-            sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
+            sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
         workflow.run(plugin='Linear')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)

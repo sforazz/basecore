@@ -47,12 +47,12 @@ if __name__ == "__main__":
             bet_workflow = brain_extraction(
                 sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
         else:
-            datasource, sessions = registration_datasource(
+            datasource, sessions, reference = registration_datasource(
                 sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
             bet_workflow = None
 
         workflow = longitudinal_registration(
-            sub_id, datasource, sessions, RESULT_DIR,
+            sub_id, datasource, sessions, reference, RESULT_DIR,
             NIPYPE_CACHE, bet_workflow=bet_workflow)
 
         workflow.run(plugin='Linear')

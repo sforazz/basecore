@@ -62,13 +62,13 @@ if __name__ == "__main__":
                 sub_id, datasource, sessions, RESULT_DIR,
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
-            datasource, sessions = segmentation_datasource(
+            datasource, sessions, reference = segmentation_datasource(
                 sub_id, os.path.join(ARGS.work_dir, 'registration_results', 'results'))
             reg_workflow = None
 
         seg_workflow = tumor_segmentation(
             datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
-            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE,
+            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reference,
             reg_workflow=reg_workflow, bet_workflow=bet_workflow)
 
         seg_workflow.run(plugin='Linear')

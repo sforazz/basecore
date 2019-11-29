@@ -7,7 +7,7 @@ from basecore.interfaces.ants import AntsRegSyn
 from basecore.workflows.datahandler import SEQUENCES, datasink_base
 
 
-def longitudinal_registration(sub_id, datasource, sessions,
+def longitudinal_registration(sub_id, datasource, sessions, reference,
                               RESULT_DIR, NIPYPE_CACHE, bet_workflow=None):
     """
     This is a workflow to register multi-modalities MR (T2, T1KM, FLAIR) to their 
@@ -23,10 +23,13 @@ def longitudinal_registration(sub_id, datasource, sessions,
     reg2T1.inputs.num_dimensions = 3
     reg2T1.inputs.num_threads = 6
 
-    regT12CT = nipype.MapNode(interface=AntsRegSyn(), iterfield=['input_file'], name='regT12CT')
-    regT12CT.inputs.transformation = 'r'
-    regT12CT.inputs.num_dimensions = 3
-    regT12CT.inputs.num_threads = 4
+    if reference:
+        regT12CT = nipype.MapNode(interface=AntsRegSyn(),
+                                  iterfield=['input_file'],
+                                  name='regT12CT')
+        regT12CT.inputs.transformation = 'r'
+        regT12CT.inputs.num_dimensions = 3
+        regT12CT.inputs.num_threads = 4
 
     reg_nodes = []
     for i in range(3):
@@ -50,6 +53,13 @@ def longitudinal_registration(sub_id, datasource, sessions,
                                   iterfield=['input_image', 'transforms'],
                                   name='apply_ts{}'.format(i))
         apply_ts_nodes.append(apply_ts)
+    # Apply ts nodes for T1_ref normalization
+    apply_ts_nodes1 = []
+    for i in range(3):
+        apply_ts = nipype.MapNode(interface=ApplyTransforms(),
+                                  iterfield=['input_image', 'transforms'],
+                                  name='apply_ts1{}'.format(i))
+        apply_ts_nodes1.append(apply_ts)
 
     split_ds_nodes = []
     for i in range(4):
@@ -61,15 +71,32 @@ def longitudinal_registration(sub_id, datasource, sessions,
                                  iterfield=['input_image', 'transforms'],
                                  name='apply_ts_t1')
     merge_nodes = []
+    if reference:
+        iterfields = ['in1', 'in2', 'in3', 'in4']
+        iterfields_t1 = ['in1', 'in2', 'in3']
+        if_0 = 2
+    else:
+        iterfields = ['in1', 'in2', 'in3']
+        iterfields_t1 = ['in1', 'in2']
+        if_0 = 1
+
     for i in range(3):
-        merge = nipype.MapNode(interface=Merge(4),
-                                 iterfield=['in1', 'in2', 'in3', 'in4'],
+        merge = nipype.MapNode(interface=Merge(len(iterfields)),
+                                 iterfield=iterfields,
                                  name='merge{}'.format(i))
         merge.inputs.ravel_inputs = True
         merge_nodes.append(merge)
-
-    merge_ts_t1 = nipype.MapNode(interface=Merge(3),
+    # Merging transforms for normalization to T1_ref
+    merge_nodes1 = []
+    for i in range(3):
+        merge = nipype.MapNode(interface=Merge(3),
                                  iterfield=['in1', 'in2', 'in3'],
+                                 name='merge1{}'.format(i))
+        merge.inputs.ravel_inputs = True
+        merge_nodes1.append(merge)
+
+    merge_ts_t1 = nipype.MapNode(interface=Merge(len(iterfields_t1)),
+                                 iterfield=iterfields_t1,
                                  name='merge_t1')
     merge_ts_t1.inputs.ravel_inputs = True
 
@@ -88,6 +115,8 @@ def longitudinal_registration(sub_id, datasource, sessions,
                            session+'/'+'reg2T1_ref.mat')]
         substitutions += [('_reg2T1{}/antsreg1Warp.nii.gz'.format(i),
                            session+'/'+'reg2T1_ref_warp.nii.gz')]
+        substitutions += [('_reg2T1{}/antsregWarped.nii.gz'.format(i),
+                           session+'/'+'reg2T1_ref.nii.gz')]
         substitutions += [('_regT12CT{}/antsreg0GenericAffine.mat'.format(i),
                            '/regT1_ref2CT.mat')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
@@ -102,6 +131,12 @@ def longitudinal_registration(sub_id, datasource, sessions,
                            session+'/'+'FLAIR_reg2CT.nii.gz')]
         substitutions += [('_apply_ts_t1{}/T1_trans.nii.gz'.format(i),
                            session+'/'+'T1_reg2CT.nii.gz')]
+        substitutions += [('_apply_ts10{}/CT1_trans.nii.gz'.format(i),
+                           session+'/'+'CT1_reg2T1_ref.nii.gz')]
+        substitutions += [('_apply_ts11{}/T2_trans.nii.gz'.format(i),
+                           session+'/'+'T2_reg2T1_ref.nii.gz')]
+        substitutions += [('_apply_ts12{}/FLAIR_trans.nii.gz'.format(i),
+                           session+'/'+'FLAIR_reg2T1_ref.nii.gz')]
 
     datasink.inputs.substitutions =substitutions
     # Create Workflow
@@ -110,22 +145,35 @@ def longitudinal_registration(sub_id, datasource, sessions,
     for i, reg in enumerate(reg_nodes):
         workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
         workflow.connect(datasource, SEQUENCES[0], reg, 'ref_file')
-
+    # bring every MR in CT space
     for i, node in enumerate(apply_ts_nodes):
         workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
-        workflow.connect(datasource, 'reference', node, 'reference_image')
+        if reference:
+            workflow.connect(datasource, 'reference', node, 'reference_image')
+        else:
+            workflow.connect(datasource, 't1_0', node, 'reference_image')
         workflow.connect(merge_nodes[i], 'out', node, 'transforms')
         workflow.connect(node, 'output_image', datasink,
                          'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
-
-    for i in range(len(sessions)):
-        workflow.connect(regT12CT, 'regmat', fake_merge, 'in{}'.format(i+1))
+    # bring every MR in T1_ref space
+    for i, node in enumerate(apply_ts_nodes1):
+        workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
+        workflow.connect(datasource, 't1_0', node, 'reference_image')
+        workflow.connect(merge_nodes1[i], 'out', node, 'transforms')
+        workflow.connect(node, 'output_image', datasink,
+                         'results.subid.@{}_reg2T1_ref'.format(SEQUENCES[i+1])) 
 
     for i, node in enumerate(merge_nodes):
-        workflow.connect(reg_nodes[i], 'regmat', node, 'in4')
-        workflow.connect(reg2T1, 'warp_file', node, 'in3')
-        workflow.connect(reg2T1, 'regmat', node, 'in2')
-        workflow.connect(fake_merge, 'out', node, 'in1')
+        workflow.connect(reg_nodes[i], 'regmat', node, 'in{}'.format(if_0+2))
+        workflow.connect(reg2T1, 'warp_file', node, 'in{}'.format(if_0+1))
+        workflow.connect(reg2T1, 'regmat', node, 'in{}'.format(if_0))
+        if reference:
+            workflow.connect(fake_merge, 'out', node, 'in1')
+    
+    for i, node in enumerate(merge_nodes1):
+        workflow.connect(reg_nodes[i], 'regmat', node, 'in3')
+        workflow.connect(reg2T1, 'warp_file', node, 'in2')
+        workflow.connect(reg2T1, 'regmat', node, 'in1')
 
     for i, mask in enumerate(apply_mask_nodes):
         workflow.connect(reg_nodes[i], 'reg_file', mask, 'in_file')
@@ -141,25 +189,36 @@ def longitudinal_registration(sub_id, datasource, sessions,
     else:
         workflow.connect(datasource, 't1_bet', reg2T1, 'input_file')
         workflow.connect(datasource, 't1_0_bet', reg2T1, 'ref_file')
-    workflow.connect(datasource, 'reference', regT12CT, 'ref_file')
-    workflow.connect(datasource, 't1_0', regT12CT, 'input_file')
+
+    if reference:
+        for i, sess in enumerate(sessions):
+            workflow.connect(regT12CT, 'regmat', fake_merge, 'in{}'.format(i+1))
+            workflow.connect(regT12CT, 'regmat', datasink,
+                             'results.subid.{0}.@regT12CT_mat'.format(sess))
+        workflow.connect(datasource, 'reference', regT12CT, 'ref_file')
+        workflow.connect(datasource, 't1_0', regT12CT, 'input_file')
+        workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
+        workflow.connect(datasource, 'reference', apply_ts_t1,
+                         'reference_image')
+    else:
+        workflow.connect(datasource, 't1_0', apply_ts_t1,
+                         'reference_image') 
+
     workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
-    workflow.connect(datasource, 'reference', apply_ts_t1,
-                     'reference_image')
+
     workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
-    workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in3')
-    workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in2')
-    workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
-    for _, sess in enumerate(sessions):
-        workflow.connect(regT12CT, 'regmat', datasink,
-                         'results.subid.{0}.@regT12CT_mat'.format(sess))
+    workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0+1))
+    workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0))
+
     workflow.connect(reg2T1, 'warp_file', datasink,
                      'results.subid.@reg2CT_warp')
     workflow.connect(reg2T1, 'regmat', datasink,
                      'results.subid.@reg2CT_mat')
+    workflow.connect(reg2T1, 'reg_file', datasink,
+                     'results.subid.@T12T1_ref')
     workflow.connect(apply_ts_t1, 'output_image', datasink,
                      'results.subid.@T1_reg2CT')
 
-    workflow = datasink_base(datasink, datasource, workflow, sessions)
+    workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
 
     return workflow

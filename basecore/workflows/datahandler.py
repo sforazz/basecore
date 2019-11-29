@@ -10,6 +10,12 @@ def gbm_datasource(sub_id, BASE_DIR):
 
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
+    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))]
+    if ref_session:
+        reference = True
+    else:
+        print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        reference = False
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
@@ -34,7 +40,7 @@ def gbm_datasource(sub_id, BASE_DIR):
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
     
-    return datasource, sessions
+    return datasource, sessions, reference
 
 
 def registration_datasource(sub_id, BASE_DIR):
@@ -42,6 +48,14 @@ def registration_datasource(sub_id, BASE_DIR):
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x
                 and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
+                    if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+    if ref_session:
+        reference = True
+    else:
+        print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        reference = False
+
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
@@ -73,7 +87,7 @@ def registration_datasource(sub_id, BASE_DIR):
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
     
-    return datasource, sessions
+    return datasource, sessions, reference
 
 
 def segmentation_datasource(sub_id, BASE_DIR):
@@ -81,6 +95,14 @@ def segmentation_datasource(sub_id, BASE_DIR):
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x
                 and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
+                    if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+    if ref_session:
+        reference = True
+    else:
+        print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        reference = False
+
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
@@ -122,10 +144,10 @@ def segmentation_datasource(sub_id, BASE_DIR):
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
     
-    return datasource, sessions
+    return datasource, sessions, reference
 
 
-def datasink_base(datasink, datasource, workflow, sessions):
+def datasink_base(datasink, datasource, workflow, sessions, reference):
 
     split_ds_nodes = []
     for i in range(len(SEQUENCES)):
@@ -146,8 +168,9 @@ def datasink_base(datasink, datasource, workflow, sessions):
             workflow.connect(datasource, SEQUENCES[i], datasink,
                              'results.subid.{0}.@{1}'.format(sessions[0],
                                                              SEQUENCES[i]))
-    workflow.connect(datasource, 'reference', datasink,
-                     'results.subid.REF.@ref_ct')
+    if reference:
+        workflow.connect(datasource, 'reference', datasink,
+                         'results.subid.REF.@ref_ct')
 
     workflow.connect(datasource, 't1_0', datasink,
                      'results.subid.T10.@ref_t1')
