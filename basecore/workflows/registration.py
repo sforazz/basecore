@@ -165,15 +165,15 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
 
     for i, node in enumerate(merge_nodes):
         workflow.connect(reg_nodes[i], 'regmat', node, 'in{}'.format(if_0+2))
-        workflow.connect(reg2T1, 'warp_file', node, 'in{}'.format(if_0+1))
-        workflow.connect(reg2T1, 'regmat', node, 'in{}'.format(if_0))
+        workflow.connect(reg2T1, 'regmat', node, 'in{}'.format(if_0+1))
+        workflow.connect(reg2T1, 'warp_file', node, 'in{}'.format(if_0))
         if reference:
             workflow.connect(fake_merge, 'out', node, 'in1')
     
     for i, node in enumerate(merge_nodes1):
         workflow.connect(reg_nodes[i], 'regmat', node, 'in3')
-        workflow.connect(reg2T1, 'warp_file', node, 'in2')
-        workflow.connect(reg2T1, 'regmat', node, 'in1')
+        workflow.connect(reg2T1, 'regmat', node, 'in2')
+        workflow.connect(reg2T1, 'warp_file', node, 'in1')
 
     for i, mask in enumerate(apply_mask_nodes):
         workflow.connect(reg_nodes[i], 'reg_file', mask, 'in_file')
@@ -207,8 +207,8 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
 
     workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
-    workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0+1))
-    workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0))
+    workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0+1))
+    workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0))
 
     workflow.connect(reg2T1, 'warp_file', datasink,
                      'results.subid.@reg2CT_warp')

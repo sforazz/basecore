@@ -97,8 +97,8 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
 #         for i in range(len(sessions)):
 #             workflow.connect(datasource, 't12ct_mat', fake_merge,
 #                              'in{}'.format(i+1))
-        workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1, 'in{}'.format(if_0+1))
-        workflow.connect(datasource, 'reg2t1_mat', merge_ts_t1, 'in{}'.format(if_0))
+        workflow.connect(datasource, 'reg2t1_mat', merge_ts_t1, 'in{}'.format(if_0+1))
+        workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1, 'in{}'.format(if_0))
         if reference:
             workflow.connect(datasource, 't12ct_mat', merge_ts_t1, 'in1')
         workflow.connect(merge_ts_t1, 'out', apply_ts_tumor, 'transforms')
