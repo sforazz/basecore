@@ -219,7 +219,10 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     workflow.connect(apply_ts_t1, 'output_image', datasink,
                      'results.subid.@T1_reg2CT')
 
-    workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
-                             extra_nodes=['t1_bet'])
+    if bet_workflow is not None:
+        workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
+    else:
+        workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
+                                 extra_nodes=['t1_bet'])
 
     return workflow

@@ -50,16 +50,16 @@ if __name__ == "__main__":
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_registration:
             if ARGS.run_bet:
-                datasource, sessions = gbm_datasource(sub_id, BASE_DIR)
+                datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
                 bet_workflow = brain_extraction(
-                    sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE)
+                    sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
             else:
                 datasource, sessions = registration_datasource(
                     sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
                 bet_workflow = None
 
             reg_workflow = longitudinal_registration(
-                sub_id, datasource, sessions, RESULT_DIR,
+                sub_id, datasource, sessions, reference, RESULT_DIR,
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
             datasource, sessions, reference = segmentation_datasource(

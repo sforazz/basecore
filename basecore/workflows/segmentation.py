@@ -12,13 +12,21 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                        reg_workflow=None, bet_workflow=None):
 
     if reg_workflow is None:
-        merge_ts_t1 = nipype.MapNode(interface=Merge(3),
-                                     iterfield=['in1', 'in2', 'in3'],
+        if reference:
+            iterfields_t1 = ['in1', 'in2', 'in3']
+            if_0 = 2
+        else:
+            iterfields_t1 = ['in1', 'in2']
+            if_0 = 1
+        merge_ts_t1 = nipype.MapNode(interface=Merge(len(iterfields_t1)),
+                                     iterfield=iterfields_t1,
                                      name='merge_t1')
         merge_ts_t1.inputs.ravel_inputs = True
+    
+
         
-        fake_merge = nipype.Node(interface=Merge(len(sessions)),
-                                 name='fake_merge')
+#         fake_merge = nipype.Node(interface=Merge(len(sessions)),
+#                                  name='fake_merge')
 
     apply_ts_gtv = nipype.MapNode(interface=ApplyTransforms(),
                                  iterfield=['input_image', 'transforms'],
@@ -86,12 +94,13 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_gtv, 'transforms')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor1, 'transforms')
     else:
-        for i in range(len(sessions)):
-            workflow.connect(datasource, 't12ct_mat', fake_merge,
-                             'in{}'.format(i+1))
-        workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1, 'in3')
-        workflow.connect(datasource, 'reg2t1_mat', merge_ts_t1, 'in2')
-        workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
+#         for i in range(len(sessions)):
+#             workflow.connect(datasource, 't12ct_mat', fake_merge,
+#                              'in{}'.format(i+1))
+        workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1, 'in{}'.format(if_0+1))
+        workflow.connect(datasource, 'reg2t1_mat', merge_ts_t1, 'in{}'.format(if_0))
+        if reference:
+            workflow.connect(datasource, 't12ct_mat', merge_ts_t1, 'in1')
         workflow.connect(merge_ts_t1, 'out', apply_ts_tumor, 'transforms')
         workflow.connect(merge_ts_t1, 'out', apply_ts_gtv, 'transforms')
         workflow.connect(merge_ts_t1, 'out', apply_ts_tumor1, 'transforms')
@@ -103,12 +112,20 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(datasource, 't1_preproc', tumor_seg, 't1')
 
     # Connect from datasource
-    workflow.connect(datasource, 'reference', apply_ts_gtv,
-                     'reference_image')
-    workflow.connect(datasource, 'reference', apply_ts_tumor1,
-                     'reference_image')
-    workflow.connect(datasource, 'reference', apply_ts_tumor,
-                     'reference_image')
+    if reference:
+        workflow.connect(datasource, 'reference', apply_ts_gtv,
+                         'reference_image')
+        workflow.connect(datasource, 'reference', apply_ts_tumor1,
+                         'reference_image')
+        workflow.connect(datasource, 'reference', apply_ts_tumor,
+                         'reference_image')
+    else:
+        workflow.connect(datasource, 't1_0', apply_ts_gtv,
+                         'reference_image')
+        workflow.connect(datasource, 't1_0', apply_ts_tumor1,
+                         'reference_image')
+        workflow.connect(datasource, 't1_0', apply_ts_tumor,
+                         'reference_image')
 
     # Connect other nodes
 

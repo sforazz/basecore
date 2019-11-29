@@ -1,6 +1,7 @@
 import os
 import nipype
 from nipype.interfaces.utility import Split
+from scripts.datasource_workflow import sequences
 
 
 SEQUENCES = ['t1', 'ct1', 't2', 'flair']
@@ -151,9 +152,9 @@ def segmentation_datasource(sub_id, BASE_DIR):
 def datasink_base(datasink, datasource, workflow, sessions, reference,
                   extra_nodes=[]):
 
-    SEQUENCES = SEQUENCES+extra_nodes
+    sequences = SEQUENCES+extra_nodes
     split_ds_nodes = []
-    for i in range(len(SEQUENCES)):
+    for i in range(len(sequences)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))
         split_ds.inputs.splits = [1]*len(sessions)
         split_ds_nodes.append(split_ds)
@@ -161,16 +162,16 @@ def datasink_base(datasink, datasource, workflow, sessions, reference,
 
     for i, node in enumerate(split_ds_nodes):
         if len(sessions) > 1:
-            workflow.connect(datasource, SEQUENCES[i], node,
+            workflow.connect(datasource, sequences[i], node,
                              'inlist')
             for j, sess in enumerate(sessions):
                 workflow.connect(node, 'out{}'.format(j+1),
                                  datasink, 'results.subid.{0}.@{1}'
-                                 .format(sess, SEQUENCES[i]))
+                                 .format(sess, sequences[i]))
         else:
-            workflow.connect(datasource, SEQUENCES[i], datasink,
+            workflow.connect(datasource, sequences[i], datasink,
                              'results.subid.{0}.@{1}'.format(sessions[0],
-                                                             SEQUENCES[i]))
+                                                             sequences[i]))
     if reference:
         workflow.connect(datasource, 'reference', datasink,
                          'results.subid.REF.@ref_ct')
