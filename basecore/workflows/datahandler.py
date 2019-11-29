@@ -10,7 +10,8 @@ def gbm_datasource(sub_id, BASE_DIR):
 
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
-    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))]
+    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
+                   if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
     if ref_session:
         reference = True
     else:
@@ -71,8 +72,8 @@ def registration_datasource(sub_id, BASE_DIR):
                                             reference='%s/%s/CT.nii.gz',
                                             t1_0='%s/%s/T1.nii.gz',
                                             t1_0_bet='%s/%s/T1_0_bet.nii.gz',
-                                            t1_bet='%s/%s/T1_bet.nii.gz',
-                                            t1_mask='%s/%s/T1_bet_mask.nii.gz')
+                                            t1_bet='%s/%s/T1_preproc.nii.gz',
+                                            t1_mask='%s/%s/T1_preproc_mask.nii.gz')
     datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
                                            ct1=[['sub_id', 'sessions']],
                                            t2=[['sub_id', 'sessions']],
@@ -147,8 +148,10 @@ def segmentation_datasource(sub_id, BASE_DIR):
     return datasource, sessions, reference
 
 
-def datasink_base(datasink, datasource, workflow, sessions, reference):
+def datasink_base(datasink, datasource, workflow, sessions, reference,
+                  extra_nodes=[]):
 
+    SEQUENCES = SEQUENCES+extra_nodes
     split_ds_nodes = []
     for i in range(len(SEQUENCES)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))

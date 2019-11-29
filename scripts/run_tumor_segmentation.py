@@ -65,6 +65,7 @@ if __name__ == "__main__":
             datasource, sessions, reference = segmentation_datasource(
                 sub_id, os.path.join(ARGS.work_dir, 'registration_results', 'results'))
             reg_workflow = None
+            bet_workflow = None
 
         seg_workflow = tumor_segmentation(
             datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
