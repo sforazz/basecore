@@ -19,6 +19,10 @@ if __name__ == "__main__":
     PARSER.add_argument('--run_bet', '-bet', action='store_true',
                         help=('Whether or not to run registration before segmentation.'
                               ' Default is False.'))
+    PARSER.add_argument('--num-cores', '-c', type=int, default=0,
+                        help=('Number of cores to use to run the registration workflow '
+                              'in parallel. Default is 0, which means the workflow '
+                              'will run linearly.'))
     PARSER.add_argument('--clean-cache', '-c', action='store_true',
                         help=('To remove all the intermediate files. Enable this only '
                               'when you are sure that the workflow is running properly '
@@ -32,6 +36,7 @@ if __name__ == "__main__":
     NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
     RESULT_DIR = os.path.join(ARGS.work_dir, 'registration_results')
     CLEAN_CACHE = ARGS.clean_cache
+    CORES = ARGS.num_cores
 
     if ARGS.run_bet:
         BASE_DIR = ARGS.input_dir
@@ -56,7 +61,13 @@ if __name__ == "__main__":
             sub_id, datasource, sessions, reference, RESULT_DIR,
             NIPYPE_CACHE, bet_workflow=bet_workflow)
 
-        workflow.run(plugin='Linear')
+        if CORES == 0:
+            print('The workflow will run linearly.')
+            workflow.run(plugin='Linear')
+        else:
+            print('The workflow will run in parallel using {} cores'
+                  .format(CORES))
+            workflow.run('MultiProc', plugin_args={'n_procs': CORES})
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)
 
