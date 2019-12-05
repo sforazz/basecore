@@ -19,7 +19,7 @@ if __name__ == "__main__":
     PARSER.add_argument('--run_bet', '-bet', action='store_true',
                         help=('Whether or not to run registration before segmentation.'
                               ' Default is False.'))
-    PARSER.add_argument('--num-cores', '-c', type=int, default=0,
+    PARSER.add_argument('--num-cores', '-nc', type=int, default=0,
                         help=('Number of cores to use to run the registration workflow '
                               'in parallel. Default is 0, which means the workflow '
                               'will run linearly.'))
