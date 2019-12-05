@@ -59,7 +59,7 @@ if __name__ == "__main__":
                 reference)
         else:
             datasource, sessions, reference = registration_datasource(
-                sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
+                sub_id, BASE_DIR)
             bet_workflow = None
 
         workflow = longitudinal_registration(
