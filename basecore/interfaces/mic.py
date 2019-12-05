@@ -5,9 +5,12 @@ import os
 import glob
 from nipype.interfaces.base import isdefined
 from basecore.utils.filemanip import split_filename
-from nnunet.inference.predict import predict_from_folder
-import torch
-
+try:
+    from nnunet.inference.predict import predict_from_folder
+    import torch
+except ModuleNotFoundError:
+    print('Cannot find import nnUNet, no brain extraction or tumor '
+          'segmentation can be performed!')
 
 class HDBetInputSpec(CommandLineInputSpec):
     

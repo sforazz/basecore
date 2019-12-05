@@ -116,7 +116,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         substitutions += [('_reg2T1{}/antsreg1Warp.nii.gz'.format(i),
                            session+'/'+'reg2T1_ref_warp.nii.gz')]
         substitutions += [('_reg2T1{}/antsregWarped.nii.gz'.format(i),
-                           session+'/'+'reg2T1_ref.nii.gz')]
+                           session+'/'+'T1_reg2T1_ref.nii.gz')]
         substitutions += [('_regT12CT{}/antsreg0GenericAffine.mat'.format(i),
                            '/regT1_ref2CT.mat')]
         substitutions += [('_masking1{}/antsregWarped_masked.nii.gz'.format(i),
