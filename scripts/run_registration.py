@@ -17,7 +17,12 @@ if __name__ == "__main__":
     PARSER.add_argument('--work_dir', '-w', type=str,
                         help=('Directory where to store the results.'))
     PARSER.add_argument('--run_bet', '-bet', action='store_true',
-                        help=('Whether or not to run registration before segmentation.'
+                        help=('Whether or not to run brain extraction before registration.'
+                              'If this bet is NOT enables, the workflow will expect to find '
+                              'a folder called "bet_results" in the provided input_dir. '
+                              'This folder must be the output of the run_bet.py function. '
+                              'If not, the workflow will fail. In the last scenario, you '
+                              'might want to enable bet to perform brain extraction.'
                               ' Default is False.'))
     PARSER.add_argument('--num-cores', '-nc', type=int, default=0,
                         help=('Number of cores to use to run the registration workflow '
@@ -41,7 +46,7 @@ if __name__ == "__main__":
     if ARGS.run_bet:
         BASE_DIR = ARGS.input_dir
     else:
-        BASE_DIR = os.path.join(ARGS.work_dir, 'bet_results',
+        BASE_DIR = os.path.join(ARGS.input_dir, 'bet_results',
                                 'results')
     sub_list = os.listdir(BASE_DIR)
 
