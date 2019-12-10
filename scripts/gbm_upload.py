@@ -2,6 +2,7 @@ from basecore.database.xnat import put
 import glob
 import os
 import shutil
+import subprocess as sp
 
 
 base_project_name = 'MRRT003'
@@ -10,6 +11,7 @@ subjects = [os.path.join(base_dir, x) for x in sorted(os.listdir(base_dir))
             if os.path.isdir(os.path.join(base_dir, x))][127:]
 mr_contrasts = ['T1', 'T2', 'CT1', 'FLAIR']
 rt_files = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
+failed = []
 
 for sub in subjects:
     sub_name = sub.split('/')[-1]
@@ -32,31 +34,45 @@ for sub in subjects:
                     if os.path.isdir(os.path.join(session, x))
                     and 'Unclassifiable' not in x
                     and x in rt_files]
-        if mr_scans:
-            for scan in mr_scans:
-                session_type = 'MR'
-                scan_name = scan.split('/')[-1].split('.')[0]
-                print('Trying to upload {} scan'.format(scan_name))
-                xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
-                put(xnat_session_name, scan_name, scan, create_session=True,
-                    overwrite=True)
-        if ct_scans:
-            for scan in ct_scans:
-                session_type = 'CT'
-                scan_name = scan.split('/')[-1].split('.')[0]
-                print('Trying to upload {} scan'.format(scan_name))
-                xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
-                put(xnat_session_name, scan_name, scan, create_session=True,
-                    overwrite=True)
-        if rt_scans:
-            for scan in rt_scans:
-                session_type = 'RT'
-                scan_name = scan.split('/')[-1].split('.')[0]
-                shutil.make_archive(scan, 'zip', scan)
-                print('Trying to upload {} scan'.format(scan_name))
-                xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
-                put(xnat_session_name, scan_name, scan+'.zip', create_session=True,
-                    overwrite=True)
-                os.remove(scan+'.zip')
+        try:
+            if mr_scans:
+                for scan in mr_scans:
+                    session_type = 'MR'
+                    scan_name = scan.split('/')[-1].split('.')[0]
+                    print('Trying to upload {} scan'.format(scan_name))
+                    xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
+                    cmd = 'xnat-put {0} {1} --create_session -o {2}'.format(xnat_session_name, scan_name, scan)
+                    sp.check_output(cmd, shell=True)
+#                     put(xnat_session_name, scan_name, scan, create_session=True,
+#                         overwrite=True)
+            if ct_scans:
+                for scan in ct_scans:
+                    session_type = 'CT'
+                    scan_name = scan.split('/')[-1].split('.')[0]
+                    print('Trying to upload {} scan'.format(scan_name))
+                    xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
+                    cmd = 'xnat-put {0} {1} --create_session -o {2}'.format(xnat_session_name, scan_name, scan)
+                    sp.check_output(cmd, shell=True)
+#                     put(xnat_session_name, scan_name, scan, create_session=True,
+#                         overwrite=True)
+            if rt_scans:
+                for scan in rt_scans:
+                    session_type = 'RT'
+                    scan_name = scan.split('/')[-1].split('.')[0]
+                    shutil.make_archive(scan, 'zip', scan)
+                    print('Trying to upload {} scan'.format(scan_name))
+                    xnat_session_name = '_'.join([base_project_name, sub_name, session_type+session_name])
+                    cmd = 'xnat-put {0} {1} --create_session -o {2}'.format(xnat_session_name, scan_name, scan+'.zip')
+                    sp.check_output(cmd, shell=True)
+#                     put(xnat_session_name, scan_name, scan+'.zip', create_session=True,
+#                         overwrite=True)
+                    os.remove(scan+'.zip')
+        except:
+            print('Session {} failed to be uploaded to XNAT'.format(session))
+            failed.append([sub, session])
+
+with open('/mnt/sdb/GBM_4sequences_sorted/failed.txt', 'w') as f:
+    for el in failed:
+        f.write('{}\n'.format(el))
 
 print('Done!')
