@@ -37,7 +37,7 @@ if __name__ == "__main__":
     if ARGS.run_registration:
         BASE_DIR = ARGS.input_dir
     else:
-        BASE_DIR = os.path.join(ARGS.work_dir, 'registration_results',
+        BASE_DIR = os.path.join(ARGS.input_dir, 'registration_results',
                                 'results')
     WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
     NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
             datasource, sessions, reference = segmentation_datasource(
-                sub_id, os.path.join(ARGS.work_dir, 'registration_results', 'results'))
+                sub_id, BASE_DIR)
             reg_workflow = None
             bet_workflow = None
 
