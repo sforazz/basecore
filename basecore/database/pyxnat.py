@@ -28,7 +28,8 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
     if config is not None:
         interface = Interface(config)
     else:
-        interface = Interface(server=url, user=user,password=pwd)
+        interface = Interface(server=url, user=user,password=pwd,
+                              proxy='http://www-int2.inet.dkfz-heidelberg.de:80')
     
     uri =  '/data/projects/%s/subjects/%s'%(project, subject)
     response = interface.put(uri)
