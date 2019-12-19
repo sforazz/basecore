@@ -52,7 +52,7 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         print('New experiment %s created!' %experiment.id())
     else:
         print('Experiment %s already in the repository' %experiment.id())
-    xnat_scan = experiment.scan(scan_name+extention)
+    xnat_scan = experiment.scan(scan_name)
     if not xnat_scan.exists():
         done = False
         z = 1
