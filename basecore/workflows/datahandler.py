@@ -190,13 +190,13 @@ def xnat_datasink(project_id, sub_id, result_dir, user, pwd,
     sub_folder = os.path.join(result_dir, sub_id)
     sessions = [x for x in sorted(os.listdir(sub_folder))
                 if os.path.isdir(os.path.join(sub_folder, x))]
-    for session in sessions:
-        print('Processing session {}'.format(session))
-        session_folder = os.path.join(sub_folder, session)
-        result_files = [x for x in sorted(glob.glob(session_folder+'/*')) if os.path.isfile(x)]
-        result_dict = {}
-        for result in result_files:
-            put(project_id, sub_id, session, result , url=url,
-                pwd=pwd, user=user, processed=processed)
-
-    return result_dict, session
+    put(project_id, sub_id, sessions, sub_folder, url=url,
+        pwd=pwd, user=user, processed=processed)
+#     for session in sessions:
+#         print('Processing session {}'.format(session))
+#         session_folder = os.path.join(sub_folder, session)
+#         result_files = [x for x in sorted(glob.glob(session_folder+'/*')) if os.path.isfile(x)]
+#         result_dict = {}
+#         for result in result_files:
+#             put(project_id, sub_id, session, result , url=url,
+#                 pwd=pwd, user=user, processed=processed)
