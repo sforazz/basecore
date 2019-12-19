@@ -2,14 +2,16 @@ from pyxnat import Interface
 from pyxnat.core.errors import DatabaseError
 import re
 from .base import get_resource_name
+from basecore.utils.filemanip import split_filename
 
 
 def put(project, subject, session, scan, config=None, url=None, pwd=None, user=None,
         processed=False):
 
+    _, scan_name, extention = split_filename(scan)
     session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
-    scan_name = scan.split('/')[-1].split('.')[0]
-    print(scan_name)
+#     scan_name = scan.split('/')[-1].split('.')[0]
+    print('Uploading {}...'.format(scan_name))
     match = session_modality_re.match(session)
     res_format = get_resource_name(scan)
     proc = ''
@@ -50,7 +52,7 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         print('New experiment %s created!' %experiment.id())
     else:
         print('Experiment %s already in the repository' %experiment.id())
-    xnat_scan = experiment.scan(scan_name)
+    xnat_scan = experiment.scan(scan_name+extention)
     if not xnat_scan.exists():
         done = False
         z = 1
@@ -75,7 +77,7 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         print('New resource %s created!' %resource.id())
     else:
         print('Resource %s already in the repository!' %resource.id())
-    xnat_resource = resource.file(scan_name)
+    xnat_resource = resource.file(scan_name+extention)
     response = xnat_resource.put(src=scan, format=res_format,
                                  content=res_format, extract=False, overwrite=True)
     
