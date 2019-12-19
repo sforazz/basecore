@@ -1,4 +1,5 @@
 from pyxnat import Interface
+from pyxnat.core.errors import DatabaseError
 import re
 from .base import get_resource_name
 
@@ -29,7 +30,7 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         interface = Interface(config)
     else:
         interface = Interface(server=url, user=user,password=pwd,
-                              proxy='http://www-int2.inet.dkfz-heidelberg.de:80')
+                              proxy='www-int2:80')
     
     uri =  '/data/projects/%s/subjects/%s'%(project, subject)
     response = interface.put(uri)
@@ -41,7 +42,10 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
     sub_id = interface.select.project(project).subject(xnat_sub.id())
     experiment = sub_id.experiment('%s_%s%s'%(xnat_sub.label(), session, proc))
     if not experiment.exists():
-        experiment.create(experiments=experiment_type)
+        try:
+            experiment.create(experiments=experiment_type)
+        except DatabaseError:
+            experiment.create(experiments=experiment_type)
         print('New experiment %s created!' %experiment.id())
     else:
         print('Experiment %s already in the repository' %experiment.id())
