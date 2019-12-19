@@ -51,14 +51,20 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         print('Experiment %s already in the repository' %experiment.id())
     xnat_scan = experiment.scan(scan_name)
     if not xnat_scan.exists():
-        xnat_scan.create(scans=scan_type)
+        try:
+            xnat_scan.create(scans=scan_type)
+        except DatabaseError:
+            xnat_scan.create(scans=scan_type)
         print('New scan %s created!' %xnat_scan.id())
     else:
         print('Scan %s already in the repository!' %xnat_scan.id())
     
     resource = xnat_scan.resource(res_format)
     if not resource.exists():
-        resource.create()
+        try:
+            resource.create()
+        except DatabaseError:
+            resource.create()
         print('New resource %s created!' %resource.id())
     else:
         print('Resource %s already in the repository!' %resource.id())
