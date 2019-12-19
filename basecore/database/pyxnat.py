@@ -53,41 +53,40 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
             except DatabaseError:
                 experiment.create(experiments=experiment_type)
             print('New experiment %s created!' %experiment.id())
+
+            for scan in scans:
+    
+                _, scan_name, extention = split_filename(scan)
+                res_format = get_resource_name(scan)
+            #     scan_name = scan.split('/')[-1].split('.')[0]
+                print('Uploading {}...'.format(scan_name))
+                xnat_scan = experiment.scan(scan_name)
+                if not xnat_scan.exists():
+                    done = False
+                    z = 1
+                    while not done:
+                        try:
+                            xnat_scan.create(scans=scan_type)
+                            done = True
+                        except DatabaseError:
+                            print('Same Database error: {} times'.format(z))
+                            z = z+1
+            #                 xnat_scan.create(scans=scan_type)
+                    print('New scan %s created!' %xnat_scan.id())
+                else:
+                    print('Scan %s already in the repository!' %xnat_scan.id())
+                
+                resource = xnat_scan.resource(res_format)
+                if not resource.exists():
+                    try:
+                        resource.create()
+                    except DatabaseError:
+                        resource.create()
+                    print('New resource %s created!' %resource.id())
+                else:
+                    print('Resource %s already in the repository!' %resource.id())
+                xnat_resource = resource.file(scan_name+extention)
+                response = xnat_resource.put(src=scan, format=res_format,
+                                             content=res_format, extract=False, overwrite=True)
         else:
             print('Experiment %s already in the repository' %experiment.id())
-
-        for scan in scans:
-
-            _, scan_name, extention = split_filename(scan)
-            res_format = get_resource_name(scan)
-        #     scan_name = scan.split('/')[-1].split('.')[0]
-            print('Uploading {}...'.format(scan_name))
-            xnat_scan = experiment.scan(scan_name)
-            if not xnat_scan.exists():
-                done = False
-                z = 1
-                while not done:
-                    try:
-                        xnat_scan.create(scans=scan_type)
-                        done = True
-                    except DatabaseError:
-                        print('Same Database error: {} times'.format(z))
-                        z = z+1
-        #                 xnat_scan.create(scans=scan_type)
-                print('New scan %s created!' %xnat_scan.id())
-            else:
-                print('Scan %s already in the repository!' %xnat_scan.id())
-            
-            resource = xnat_scan.resource(res_format)
-            if not resource.exists():
-                try:
-                    resource.create()
-                except DatabaseError:
-                    resource.create()
-                print('New resource %s created!' %resource.id())
-            else:
-                print('Resource %s already in the repository!' %resource.id())
-            xnat_resource = resource.file(scan_name+extention)
-            response = xnat_resource.put(src=scan, format=res_format,
-                                         content=res_format, extract=False, overwrite=True)
-    
