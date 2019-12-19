@@ -1,9 +1,9 @@
-"Script to run the tumor segmentation using HD-GLIO"
+"Script to run image registration for the temporal GBM analysis"
 import os
 import argparse
 import shutil
 from basecore.workflows.datahandler import (
-    gbm_datasource, registration_datasource)
+    gbm_datasource, registration_datasource, xnat_datasink)
 from basecore.workflows.bet import brain_extraction
 from basecore.workflows.registration import longitudinal_registration
 
@@ -33,6 +33,19 @@ if __name__ == "__main__":
                               'when you are sure that the workflow is running properly '
                               'otherwise it will always restart from scratch. '
                               'Default False.'))
+    PARSER.add_argument('--xnat-sink', '-xs', action='store_true',
+                        help=('Whether or not to upload the processed files to XNAT. '
+                              'Default is False'))
+    PARSER.add_argument('--xnat-url', '-xurl', type=str, default='https://central.xnat.org',
+                        help=('If xnat-sink, the url of the server must be provided here. '
+                              'Default is https://central.xnat.org'))#
+    PARSER.add_argument('--xnat-pid', '-xpid', type=str,
+                        help=('If xnat-sink, the project ID o the server where to upload '
+                              'the results must be provided here.'))
+    PARSER.add_argument('--xnat-user', '-xuser', type=str,
+                        help=('If xnat-sink, the username on the server must be provided here.'))
+    PARSER.add_argument('--xnat-pwd', '-xpwd', type=str,
+                        help=('If xnat-sink, the password on the server must be provided here.'))
 
     ARGS = PARSER.parse_args()
 
@@ -73,6 +86,16 @@ if __name__ == "__main__":
             print('The workflow will run in parallel using {} cores'
                   .format(CORES))
             workflow.run('MultiProc', plugin_args={'n_procs': CORES})
+
+        if ARGS.xnat_sink:
+            print('Uploading the results to XNAT with the following parameters:')
+            print('Server: {}'.format(ARGS.xnat_url))
+            print('Project ID: {}'.format(ARGS.xnat_pid))
+            print('User ID: {}'.format(ARGS.xnat_user))
+
+            xnat_datasink(ARGS.xnat_pid, sub_id, RESULT_DIR, ARGS.xnat_user, ARGS.xnat_pwd,
+                          url=ARGS.xnat_url, processed=True)
+            print('Uploading succesfully complited!')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)
 

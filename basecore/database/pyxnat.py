@@ -3,13 +3,19 @@ import re
 from .base import get_resource_name
 
 
-def put(project, subject, session, scan, config=None, url=None, pwd=None, user=None):
+def put(project, subject, session, scan, config=None, url=None, pwd=None, user=None,
+        processed=False):
 
     session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
     scan_name = scan.split('/')[-1].split('.nii.gz')[0]
     match = session_modality_re.match(session)
     res_format = get_resource_name(scan)
-    if match is None or match.group(1) == 'MR':
+    proc = ''
+    if match is None and processed:
+        experiment_type = 'xnat:mrSessionData'
+        scan_type = 'xnat:mrScanData'
+        proc = '_processed'
+    elif match.group(1) == 'MR':
         experiment_type = 'xnat:mrSessionData'
         scan_type = 'xnat:mrScanData'
     elif match.group(1) == 'CT' or match.group(1) == 'CTREF':
@@ -29,9 +35,10 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
     subject_uid = response.content
     print('New subject %s created!' %subject_uid)
 
-    xnat_sub = list(interface.select.project(project).subjects())[0]
+    xnat_subs = interface.select.project(project).subjects()
+    xnat_sub = [x for x in xnat_subs if x.label() == subject][0]
     sub_id = interface.select.project(project).subject(xnat_sub.id())
-    experiment = sub_id.experiment('%s_%s'%(xnat_sub.label(), session))
+    experiment = sub_id.experiment('%s_%s%s'%(xnat_sub.label(), session, proc))
     if not experiment.exists():
         experiment.create(experiments=experiment_type)
         print('New experiment %s created!' %experiment.id())
