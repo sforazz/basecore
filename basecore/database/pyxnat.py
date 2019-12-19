@@ -8,7 +8,7 @@ def put(project, subject, session, scan, config=None, url=None, pwd=None, user=N
         processed=False):
 
     session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
-    scan_name = scan.split('/')[-1].split('.nii.gz')[0]
+    scan_name = scan.split('/')[-1].split('.')[0]
     print(scan_name)
     match = session_modality_re.match(session)
     res_format = get_resource_name(scan)
