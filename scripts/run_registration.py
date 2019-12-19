@@ -93,8 +93,9 @@ if __name__ == "__main__":
             print('Project ID: {}'.format(ARGS.xnat_pid))
             print('User ID: {}'.format(ARGS.xnat_user))
 
-            xnat_datasink(ARGS.xnat_pid, sub_id, RESULT_DIR, ARGS.xnat_user, ARGS.xnat_pwd,
-                          url=ARGS.xnat_url, processed=True)
+            xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
+                          ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
+
             print('Uploading succesfully complited!')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)
