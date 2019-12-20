@@ -6,6 +6,7 @@ from basecore.workflows.datahandler import (
     gbm_datasource, registration_datasource, xnat_datasink)
 from basecore.workflows.bet import brain_extraction
 from basecore.workflows.registration import longitudinal_registration
+import time
 
 
 if __name__ == "__main__":
@@ -64,6 +65,7 @@ if __name__ == "__main__":
     sub_list = os.listdir(BASE_DIR)
 
     for sub_id in sub_list:
+        ready = False
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_bet:
             datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
@@ -87,9 +89,15 @@ if __name__ == "__main__":
                   .format(CORES))
             workflow.run('MultiProc', plugin_args={'n_procs': CORES})
 
-        shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
-                        '/nfs/extra_hd/result2upload/{}'.format(sub_id))
-        os.mkdir('/nfs/extra_hd/result2upload/ready')
+        while not ready:
+            if not os.path.isdir('/nfs/extra_hd/result2upload/ready'):
+                shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
+                                '/nfs/extra_hd/result2upload/{}'.format(sub_id))
+                os.mkdir('/nfs/extra_hd/result2upload/ready')
+                ready = True
+            else:
+                print('Old results are still in the folder, wait 1 minute...')
+                time.sleep(60)
         if ARGS.xnat_sink:
             print('Uploading the results to XNAT with the following parameters:')
             print('Server: {}'.format(ARGS.xnat_url))
