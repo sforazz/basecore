@@ -13,6 +13,7 @@ from collections import defaultdict
 from functools import reduce
 from operator import add
 from basecore.utils.dicom import DicomInfo
+from xnat.exceptions import XNATResponseError
 import xnat
 
 
@@ -124,92 +125,95 @@ def put(session, scan, *filenames, **kwargs):
         if resource_name == 'DICOM':
             info = DicomInfo(filenames[0])
             _, dicom_attributes = info.get_tag(DICOM_TAGS)
-    with connect(**kwargs) as login:
-#         login = xnat.connect('https://central.xnat.org', user="fsforazz", password="sono1genio!")
-        match = session_modality_re.match(session)
-        if match is None or match.group(1) == 'MR':
-            session_cls = login.classes.MrSessionData
-            scan_cls = login.classes.MrScanData
-        elif match is None or match.group(1) == 'CT':
-            session_cls = login.classes.CtSessionData
-            scan_cls = login.classes.CtScanData
-        elif match is None or match.group(1) == 'RT':
-            session_cls = login.classes.RtSessionData
-            scan_cls = login.classes.RtImageScanData
-        else:
-            # Default to MRSession
-            session_cls = login.classes.MrSessionData
-            scan_cls = login.classes.MrScanData
-        try:
-            xsession = login.experiments[session]
-        except KeyError:
-            if create_session:
-                project_id = session.split('_')[0]
-                subject_id = '_'.join(session.split('_')[:2])
+#     with connect(**kwargs) as login:
+    login = xnat.connect('https://central.xnat.org', user="fsforazz", password="sono1genio!")
+    match = session_modality_re.match(session)
+    if match is None or match.group(1) == 'MR':
+        session_cls = login.classes.MrSessionData
+        scan_cls = login.classes.MrScanData
+    elif match is None or match.group(1) == 'CT' or match.group(1) == 'CTREF':
+        session_cls = login.classes.CtSessionData
+        scan_cls = login.classes.CtScanData
+    elif match is None or match.group(1) == 'RT':
+        session_cls = login.classes.RtSessionData
+        scan_cls = login.classes.RtImageScanData
+    else:
+        # Default to MRSession
+        session_cls = login.classes.MrSessionData
+        scan_cls = login.classes.MrScanData
+    try:
+        xsession = login.experiments[session]
+    except KeyError:
+        if create_session:
+            project_id = session.split('_')[0]
+            subject_id = '_'.join(session.split('_')[:2])
+            try:
+                xproject = login.projects[project_id]
+            except KeyError:
+                raise XnatUtilsUsageError(
+                    "Cannot create session '{}' as '{}' does not exist "
+                    "(or you don't have access to it)".format(session,
+                                                              project_id))
+            # Creates a corresponding subject and session if they don't
+            # exist
+            xsubject = login.classes.SubjectData(label=subject_id,
+                                                    parent=xproject)
+            if dicom_attributes is not None:
                 try:
-                    xproject = login.projects[project_id]
-                except KeyError:
-                    raise XnatUtilsUsageError(
-                        "Cannot create session '{}' as '{}' does not exist "
-                        "(or you don't have access to it)".format(session,
-                                                                  project_id))
-                # Creates a corresponding subject and session if they don't
-                # exist
-                xsubject = login.classes.SubjectData(label=subject_id,
-                                                        parent=xproject)
-                if dicom_attributes is not None:
-                    try:
-                        xsubject.demographics.gender = dicom_attributes['PatientSex'][0]
-                        xsubject.demographics.dob = dicom_attributes['PatientBirthDate'][0]
-                    except:
-                        print('No valid DICOM attributes found. The subject instance will be '
-                              'created without those information.')
-                        pass
+                    xsubject.demographics.gender = dicom_attributes['PatientSex'][0]
+                    xsubject.demographics.dob = dicom_attributes['PatientBirthDate'][0]
+                except:
+                    print('No valid DICOM attributes found. The subject instance will be '
+                          'created without those information.')
+                    pass
+            try:
                 xsession = session_cls(
                     label=session, parent=xsubject)
-                if dicom_attributes is not None and dicom_attributes['SeriesDate']:
-                    xsession.date = dicom_attributes['SeriesDate'][0]
-                print("{} session successfully created."
-                      .format(xsession.label))
-            else:
-                raise XnatUtilsUsageError(
-                    "'{}' session does not exist, to automatically create it "
-                    "please use '--create_session' option."
-                    .format(session))
-        xdataset = scan_cls(id=scan, type=scan, parent=xsession)
-        if overwrite:
+            except XNATResponseError:
+                print('Response Error, trying to continue..')
+            if dicom_attributes is not None and dicom_attributes['SeriesDate']:
+                xsession.date = dicom_attributes['SeriesDate'][0]
+            print("{} session successfully created."
+                  .format(xsession.label))
+        else:
+            raise XnatUtilsUsageError(
+                "'{}' session does not exist, to automatically create it "
+                "please use '--create_session' option."
+                .format(session))
+    xdataset = scan_cls(id=scan, type=scan, parent=xsession)
+    if overwrite:
+        try:
+            xdataset.resources[resource_name].delete()
+            print("Deleted existing dataset at {}:{}".format(
+                session, scan))
+        except KeyError:
+            pass
+    resource = xdataset.create_resource(resource_name)
+    for fname in filenames:
+        resource.upload(fname, os.path.basename(fname))
+        print("{} uploaded to {}:{}".format(
+            fname, session, scan))
+    print("Uploaded files, checking digests...")
+    # Check uploaded files checksums
+    remote_digests = get_digests(resource)
+    for fname in filenames:
+        remote_digest = remote_digests[
+            os.path.basename(fname).replace(' ', '%20')]
+        with open(fname, 'rb') as f:
             try:
-                xdataset.resources[resource_name].delete()
-                print("Deleted existing dataset at {}:{}".format(
-                    session, scan))
-            except KeyError:
-                pass
-        resource = xdataset.create_resource(resource_name)
-        for fname in filenames:
-            resource.upload(fname, os.path.basename(fname))
-            print("{} uploaded to {}:{}".format(
-                fname, session, scan))
-        print("Uploaded files, checking digests...")
-        # Check uploaded files checksums
-        remote_digests = get_digests(resource)
-        for fname in filenames:
-            remote_digest = remote_digests[
-                os.path.basename(fname).replace(' ', '%20')]
-            with open(fname, 'rb') as f:
-                try:
-                    local_digest = hashlib.md5(f.read()).hexdigest()
-                except OSError:
-                    raise XnatUtilsDigestCheckFailedError(
-                        "Could not check digest of '{}' "
-                        "(reference '{}'), possibly file too large"
-                        .format(fname, remote_digest))
-            if local_digest != remote_digest:
-                raise XnatUtilsDigestCheckError(
-                    "Remote digest does not match local ({} vs {}) "
-                    "for {}. Please upload your datasets again"
-                    .format(remote_digest, local_digest, fname))
-            print("Successfully checked digest for {}".format(
-                fname, session, scan))
+                local_digest = hashlib.md5(f.read()).hexdigest()
+            except OSError:
+                raise XnatUtilsDigestCheckFailedError(
+                    "Could not check digest of '{}' "
+                    "(reference '{}'), possibly file too large"
+                    .format(fname, remote_digest))
+        if local_digest != remote_digest:
+            raise XnatUtilsDigestCheckError(
+                "Remote digest does not match local ({} vs {}) "
+                "for {}. Please upload your datasets again"
+                .format(remote_digest, local_digest, fname))
+        print("Successfully checked digest for {}".format(
+            fname, session, scan))
 
 
 def get(session, download_dir, scans=None, resource_name=None,
