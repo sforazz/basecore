@@ -87,6 +87,9 @@ if __name__ == "__main__":
                   .format(CORES))
             workflow.run('MultiProc', plugin_args={'n_procs': CORES})
 
+        shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
+                        '/nfs/extra_hd/result2upload')
+        os.mkdir('/nfs/extra_hd/result2upload/ready')
         if ARGS.xnat_sink:
             print('Uploading the results to XNAT with the following parameters:')
             print('Server: {}'.format(ARGS.xnat_url))
