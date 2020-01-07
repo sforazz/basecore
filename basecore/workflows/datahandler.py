@@ -1,9 +1,6 @@
 import os
 import nipype
-import glob
 from nipype.interfaces.utility import Split
-from scripts.datasource_workflow import sequences
-from nipype.interfaces.io import XNATSink
 from basecore.database.pyxnat import put
 
 
@@ -192,11 +189,3 @@ def xnat_datasink(project_id, sub_id, result_dir, user, pwd,
                 if os.path.isdir(os.path.join(sub_folder, x))]
     put(project_id, sub_id, sessions, sub_folder, url=url,
         pwd=pwd, user=user, processed=processed)
-#     for session in sessions:
-#         print('Processing session {}'.format(session))
-#         session_folder = os.path.join(sub_folder, session)
-#         result_files = [x for x in sorted(glob.glob(session_folder+'/*')) if os.path.isfile(x)]
-#         result_dict = {}
-#         for result in result_files:
-#             put(project_id, sub_id, session, result , url=url,
-#                 pwd=pwd, user=user, processed=processed)

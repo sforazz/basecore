@@ -28,6 +28,7 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
     sub_id = interface.select.project(project).subject(xnat_sub.id())
 
     for session in sessions:
+        print('Processing session {}'.format(session))
         session_folder = os.path.join(sub_folder, session)
         scans = [x for x in sorted(glob.glob(session_folder+'/*')) if os.path.isfile(x)]
         match = session_modality_re.match(session)
@@ -90,3 +91,39 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
                                              content=res_format, extract=False, overwrite=True)
         else:
             print('Experiment %s already in the repository' %experiment.id())
+
+
+def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True):
+
+    if config is not None:
+        interface = Interface(config)
+    else:
+        interface = Interface(server=url, user=user,password=pwd,
+                              proxy='www-int2:80')
+
+    subjects = interface.select.project(project_id).subjects().get()
+    for sub_id in subjects:
+        xnat_sub = interface.select.project(project_id).subject(sub_id)
+        sub_name = xnat_sub.label()
+        if processed:
+            sessions = [x for x in xnat_sub.experiments().get()
+                        if 'processed' in xnat_sub.experiment(x).label()]
+        else:
+            sessions = xnat_sub.experiments().get()
+
+        for session_id in sessions:
+            xnat_session = xnat_sub.experiment(session_id)
+            session_name = xnat_session.label()
+            folder_path = os.path.join(cache_dir, sub_name, session_name)
+            os.makedirs(folder_path)
+            scans = xnat_session.scans().get()
+            for scan_id in scans:
+                xnat_scan = xnat_session.scan(scan_id)
+                resources = xnat_scan.resources().get()
+                for res_id in resources:
+                    xnat_resource = xnat_scan.resource(res_id)
+                    files = xnat_resource.files().get()
+                    for file_id in files:
+                        scan_name = xnat_resource.file(file_id).label()
+                        xnat_resource.file(file_id).get_copy(
+                            os.path.join(folder_path, scan_name))
