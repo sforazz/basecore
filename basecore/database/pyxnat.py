@@ -102,14 +102,17 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                               proxy='www-int2:80')
 
     subjects = interface.select.project(project_id).subjects().get()
+    print('Found {0} subjects in project {1}'.format(len(subjects), project_id))
     for sub_id in subjects:
         xnat_sub = interface.select.project(project_id).subject(sub_id)
         sub_name = xnat_sub.label()
         if processed:
             sessions = [x for x in xnat_sub.experiments().get()
                         if 'processed' in xnat_sub.experiment(x).label()]
+            print('\nFound {0} processed sessions for subject {1}'.format(len(sessions), sub_name))
         else:
             sessions = xnat_sub.experiments().get()
+            print('Found {0} sessions for subject {1}'.format(len(sessions), sub_name))
 
         for session_id in sessions:
             xnat_session = xnat_sub.experiment(session_id)
@@ -125,5 +128,6 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                     files = xnat_resource.files().get()
                     for file_id in files:
                         scan_name = xnat_resource.file(file_id).label()
+                        print('Downloading resource {} ...'.format(scan_name))
                         xnat_resource.file(file_id).get_copy(
                             os.path.join(folder_path, scan_name))
