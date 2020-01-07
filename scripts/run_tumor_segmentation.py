@@ -35,6 +35,9 @@ if __name__ == "__main__":
     PARSER.add_argument('--xnat-sink', '-xs', action='store_true',
                         help=('Whether or not to upload the processed files to XNAT. '
                               'Default is False'))
+    PARSER.add_argument('--xnat-source', action='store_true',
+                        help=('Whether or not to source data from XNAT. '
+                              'Default is False'))
     PARSER.add_argument('--xnat-url', '-xurl', type=str, default='https://central.xnat.org',
                         help=('If xnat-sink, the url of the server must be provided here. '
                               'Default is https://central.xnat.org'))#
@@ -48,7 +51,7 @@ if __name__ == "__main__":
 
     ARGS = PARSER.parse_args()
 
-    if ARGS.run_registration:
+    if ARGS.run_registration or ARGS.xnat_source:
         BASE_DIR = ARGS.input_dir
     else:
         BASE_DIR = os.path.join(ARGS.input_dir, 'registration_results',
