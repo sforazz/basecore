@@ -116,7 +116,12 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
 
         for session_id in sessions:
             xnat_session = xnat_sub.experiment(session_id)
-            session_name = xnat_session.label()
+            if 'T10' in xnat_session.label():
+                session_name = 'T10'
+            elif 'REF' in xnat_session.label():
+                session_name = 'REF'
+            else:
+                session_name = xnat_session.label()
             folder_path = os.path.join(cache_dir, sub_name, session_name)
             os.makedirs(folder_path)
             scans = xnat_session.scans().get()
