@@ -95,6 +95,8 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
 
 def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True):
 
+    failed = []
+
     if config is not None:
         interface = Interface(config)
     else:
@@ -121,7 +123,7 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
             elif 'REF' in xnat_session.label():
                 session_name = 'REF'
             else:
-                session_name = xnat_session.label()
+                session_name = xnat_session.label().split('_')[1]
             folder_path = os.path.join(cache_dir, sub_name, session_name)
             os.makedirs(folder_path)
             scans = xnat_session.scans().get()
@@ -132,7 +134,22 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                     xnat_resource = xnat_scan.resource(res_id)
                     files = xnat_resource.files().get()
                     for file_id in files:
+                        downloaded = False
                         scan_name = xnat_resource.file(file_id).label()
                         print('Downloading resource {} ...'.format(scan_name))
-                        xnat_resource.file(file_id).get_copy(
-                            os.path.join(folder_path, scan_name))
+                        while not downloaded:
+                            try:
+                                xnat_resource.file(file_id).get_copy(
+                                    os.path.join(folder_path, scan_name))
+                                downloaded = True
+                            except ConnectionError:
+                                print('Connection lost during download. Try again...')
+                            except:
+                                print('Could not download {0} for session {1} '
+                                      'in subject {2}. Please try again later'
+                                      .format(scan_name, session_name, sub_name))
+                                failed.append([sub_name, session_name, scan_name])
+    if failed:
+        with open(cache_dir+'/failed_download.txt', 'w') as f:
+            for line in failed:
+                f.write(line+'\n')
