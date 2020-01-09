@@ -7,10 +7,11 @@ from .base import get_resource_name
 from basecore.utils.filemanip import split_filename
 
 
+session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
+
+
 def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None, user=None,
         processed=False):
-
-    session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
 
     if config is not None:
         interface = Interface(config)
@@ -93,8 +94,11 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
             print('Experiment %s already in the repository' %experiment.id())
 
 
-def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True):
-
+def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True,
+        subjects=[]):
+    "Function to download ALL the subject/sessions/scans from one project."
+    "If processed=True, only the processed sessions will be downloaded, "
+    "otherwise only the not-processed (i.e. the sessions with raw data)."
     failed = []
 
     if config is not None:
@@ -103,9 +107,25 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
         interface = Interface(server=url, user=user,password=pwd,
                               proxy='www-int2:80')
 
-    subjects = interface.select.project(project_id).subjects().get()
-    print('Found {0} subjects in project {1}'.format(len(subjects), project_id))
-    for sub_id in subjects:
+    xnat_subjects = interface.select.project(project_id).subjects().get()
+    xnat_sub_labels = [interface.select.project(project_id).subject(x).label()
+                       for x in xnat_subjects]
+    print('Found {0} subjects in project {1}'.format(len(xnat_subjects), project_id))
+    # check to see if the requested subjects are on XNAT
+    if subjects:
+        if not set(subjects).issubset(xnat_sub_labels):
+            unprocessed = [x for x in subjects if x not in xnat_sub_labels]
+            print('The following subjects are not present in project {0} on XNAT'
+                  ' and will be ignored: {1}'
+                  .format(project_id, '\n'.join(unprocessed)))
+            xnat_subjects = [x for x in subjects if x not in unprocessed]
+        else:
+            xnat_subjects = subjects
+            print('All the requested subjects were found on XNAT.')
+    else:
+        print('Since no subjects were specified, all subjects will be downloaded')
+
+    for sub_id in xnat_subjects:
         xnat_sub = interface.select.project(project_id).subject(sub_id)
         sub_name = xnat_sub.label()
         if processed:
@@ -118,12 +138,16 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
 
         for session_id in sessions:
             xnat_session = xnat_sub.experiment(session_id)
-            if 'T10' in xnat_session.label():
-                session_name = 'T10'
-            elif 'REF' in xnat_session.label():
-                session_name = 'REF'
-            else:
+            if len(xnat_session.label().split('_')) == 3:
                 session_name = xnat_session.label().split('_')[1]
+            elif len(xnat_session.label().split('_')) == 4:
+                session_name = xnat_session.label().split('_')[2]
+            else:
+                print('WARNING: The session name seems to be different from '
+                      'the convention used in the current workflow. It will be '
+                      'taken equal to the session label from XNAT.')
+                session_name = xnat_session.label().split('_')
+
             folder_path = os.path.join(cache_dir, sub_name, session_name)
             os.makedirs(folder_path)
             scans = xnat_session.scans().get()

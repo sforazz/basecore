@@ -7,6 +7,8 @@ from basecore.workflows.bet import brain_extraction
 from basecore.workflows.datahandler import (
     gbm_datasource, segmentation_datasource, registration_datasource,
     xnat_datasink)
+from basecore.database.pyxnat import get
+from basecore.database.base import get_subject_list
 
 
 if __name__ == "__main__":
@@ -56,14 +58,19 @@ if __name__ == "__main__":
     else:
         BASE_DIR = os.path.join(ARGS.input_dir, 'registration_results',
                                 'results')
-    WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
     NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
     RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
     CLEAN_CACHE = ARGS.clean_cache
 
-    sub_list = os.listdir(BASE_DIR)
+    if os.path.isdir(BASE_DIR):
+        sub_list = os.listdir(BASE_DIR)
+    elif ARGS.xnat_source:
+        sub_list = get_subject_list(
+            ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+            url=ARGS.xnat_url)
 
     for sub_id in sub_list:
+        print(sub_id)
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_registration:
             if ARGS.run_bet:
@@ -79,6 +86,11 @@ if __name__ == "__main__":
                 sub_id, datasource, sessions, reference, RESULT_DIR,
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
+            if ARGS.xnat_source:
+                xnat_cache = os.path.join(BASE_DIR, 'xnat_cache')
+                get(ARGS.xnat_pid, xnat_cache, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                    url=ARGS.xnat_url, processed=True, subjects=[sub_id])
+                BASE_DIR = xnat_cache
             datasource, sessions, reference = segmentation_datasource(
                 sub_id, BASE_DIR)
             reg_workflow = None

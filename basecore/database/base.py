@@ -16,6 +16,7 @@ from .exceptions import (
     XnatUtilsSkippedAllSessionsException, XnatUtilsError)
 import warnings
 import logging
+from pyxnat import Interface
 
 
 logger = logging.getLogger('xnat-utils')
@@ -200,6 +201,18 @@ def connect(server=None, user=None, loglevel='ERROR', connection=None,
                     "the '--no_netrc' or '-n' option".format(
                         server, netrc_path))
     return connection
+
+
+def get_subject_list(project_id, url, user, pwd):
+
+    interface = Interface(server=url, user=user, password=pwd,
+                              proxy='www-int2:80')
+
+    xnat_subjects = interface.select.project(project_id).subjects().get()
+    print('Subjects {}'.format(len(xnat_subjects)))
+    xnat_sub_labels = [interface.select.project(project_id).subject(x).label()
+                       for x in xnat_subjects]
+    return xnat_sub_labels
 
 
 def write_netrc(netrc_path, servers):
