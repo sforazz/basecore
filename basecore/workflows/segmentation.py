@@ -41,6 +41,24 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                                  name='apply_ts_tumor1')
     apply_ts_tumor1.inputs.interpolation = 'NearestNeighbor'
 
+    if reference:
+        merge_ts_t1ref = nipype.MapNode(interface=Merge(len(iterfields_t1)),
+                                         iterfield=['in1', 'in2'],
+                                         name='merge_t1ref')
+        merge_ts_t1ref.inputs.ravel_inputs = True
+        apply_ts_gtv_t1ref = nipype.MapNode(interface=ApplyTransforms(),
+                                            iterfield=['input_image', 'transforms'],
+                                            name='apply_ts_gtv_t1ref')
+        apply_ts_gtv_t1ref.inputs.interpolation = 'NearestNeighbor'
+        apply_ts_tumor_t1ref = nipype.MapNode(interface=ApplyTransforms(),
+                                              iterfield=['input_image', 'transforms'],
+                                              name='apply_ts_tumor_t1ref')
+        apply_ts_tumor_t1ref.inputs.interpolation = 'NearestNeighbor'
+        apply_ts_tumor1_t1ref = nipype.MapNode(interface=ApplyTransforms(),
+                                               iterfield=['input_image', 'transforms'],
+                                               name='apply_ts_tumor1_t1ref')
+        apply_ts_tumor1_t1ref.inputs.interpolation = 'NearestNeighbor'
+
     tumor_seg  = nipype.MapNode(interface=HDGlioPredict(),
                                 iterfield=['t1', 'ct1', 't2', 'flair'],
                                 name='tumor_segmentation')
@@ -77,6 +95,13 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                            session+'/'+'Tumor_predicted_2modalities_reg2CT.nii.gz')]
         substitutions += [('_apply_ts_tumor{}/segmentation_trans.nii.gz'.format(i),
                            session+'/'+'Tumor_predicted_reg2CT.nii.gz')]
+        
+        substitutions += [('_apply_ts_gtv_t1ref{}/subject1_trans.nii.gz'.format(i),
+                           session+'/'+'GTV_predicted_reg2T1ref.nii.gz')]
+        substitutions += [('_apply_ts_tumor1_t1ref{}/subject1_trans.nii.gz'.format(i),
+                           session+'/'+'Tumor_predicted_2modalities_reg2T1ref.nii.gz')]
+        substitutions += [('_apply_ts_tumor_t1ref{}/segmentation_trans.nii.gz'.format(i),
+                           session+'/'+'Tumor_predicted_reg2T1ref.nii.gz')]
     datasink.inputs.substitutions =substitutions
 
     # Create Workflow
@@ -93,6 +118,9 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor, 'transforms')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_gtv, 'transforms')
         workflow.connect(reg_workflow, 'merge_t1.out', apply_ts_tumor1, 'transforms')
+        if reference:
+            workflow.connect(reg_workflow, 'reg2T1.regmat', merge_ts_t1ref, 'in2')
+            workflow.connect(reg_workflow, 'reg2T1.warp_file', merge_ts_t1ref, 'in1')
     else:
 #         for i in range(len(sessions)):
 #             workflow.connect(datasource, 't12ct_mat', fake_merge,
@@ -101,6 +129,8 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1, 'in{}'.format(if_0))
         if reference:
             workflow.connect(datasource, 't12ct_mat', merge_ts_t1, 'in1')
+            workflow.connect(datasource, 'reg2t1_mat', merge_ts_t1ref, 'in1')
+            workflow.connect(datasource, 'reg2t1_warp', merge_ts_t1ref, 'in2')
         workflow.connect(merge_ts_t1, 'out', apply_ts_tumor, 'transforms')
         workflow.connect(merge_ts_t1, 'out', apply_ts_gtv, 'transforms')
         workflow.connect(merge_ts_t1, 'out', apply_ts_tumor1, 'transforms')
@@ -112,12 +142,21 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         workflow.connect(datasource, 't1_preproc', tumor_seg, 't1')
 
     # Connect from datasource
-    if reference:
+    if reference:    
+        workflow.connect(merge_ts_t1ref, 'out', apply_ts_tumor_t1ref, 'transforms')
+        workflow.connect(merge_ts_t1ref, 'out', apply_ts_gtv_t1ref, 'transforms')
+        workflow.connect(merge_ts_t1ref, 'out', apply_ts_tumor1_t1ref, 'transforms')
         workflow.connect(datasource, 'reference', apply_ts_gtv,
                          'reference_image')
         workflow.connect(datasource, 'reference', apply_ts_tumor1,
                          'reference_image')
         workflow.connect(datasource, 'reference', apply_ts_tumor,
+                         'reference_image')
+        workflow.connect(datasource, 't1_0', apply_ts_gtv_t1ref,
+                         'reference_image')
+        workflow.connect(datasource, 't1_0', apply_ts_tumor1_t1ref,
+                         'reference_image')
+        workflow.connect(datasource, 't1_0', apply_ts_tumor_t1ref,
                          'reference_image')
     else:
         workflow.connect(datasource, 't1_0', apply_ts_gtv,
@@ -157,6 +196,13 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                      'results.subid.@tumor_reg2CT')
     workflow.connect(apply_ts_tumor1, 'output_image', datasink,
                      'results.subid.@tumor1_reg2CT')
+    if reference:
+        workflow.connect(apply_ts_gtv_t1ref, 'output_image', datasink,
+                         'results.subid.@gtv_reg2T1ref')
+        workflow.connect(apply_ts_tumor_t1ref, 'output_image', datasink,
+                         'results.subid.@tumor_reg2T1ref')
+        workflow.connect(apply_ts_tumor1_t1ref, 'output_image', datasink,
+                         'results.subid.@tumor1_reg2T1ref')
 
     workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
 
