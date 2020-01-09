@@ -64,10 +64,17 @@ if __name__ == "__main__":
 
     if os.path.isdir(BASE_DIR) and not ARGS.xnat_source:
         sub_list = os.listdir(BASE_DIR)
-    elif ARGS.xnat_source:
+    elif ARGS.xnat_source and not ARGS.run_registration:
+        BASE_DIR = os.path.join(BASE_DIR, 'xnat_cache')
         sub_list = get_subject_list(
             ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
             url=ARGS.xnat_url)
+    elif ARGS.xnat_source and ARGS.run_registration:
+        raise NotImplementedError('XNAT data source is currently supported only for tumor '
+                                  'segmentation ONLY, i.e. it assumes that you already '
+                                  'performed brain extraction and registration and that '
+                                  'those results were pushed to XNAT.')
+    
 
     for sub_id in sub_list:
         print('Processing subject {}'.format(sub_id))
@@ -87,10 +94,9 @@ if __name__ == "__main__":
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
             if ARGS.xnat_source:
-                xnat_cache = os.path.join(BASE_DIR, 'xnat_cache')
-                get(ARGS.xnat_pid, xnat_cache, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                
+                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
                     url=ARGS.xnat_url, processed=True, subjects=[sub_id])
-                BASE_DIR = xnat_cache
             datasource, sessions, reference = segmentation_datasource(
                 sub_id, BASE_DIR)
             reg_workflow = None
