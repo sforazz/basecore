@@ -58,6 +58,9 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                                                iterfield=['input_image', 'transforms'],
                                                name='apply_ts_tumor1_t1ref')
         apply_ts_tumor1_t1ref.inputs.interpolation = 'NearestNeighbor'
+        outname = 'reg2CT'
+    else:
+        outname = 'reg2T1ref'
 
     tumor_seg  = nipype.MapNode(interface=HDGlioPredict(),
                                 iterfield=['t1', 'ct1', 't2', 'flair'],
@@ -90,11 +93,11 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         substitutions += [('_tumor_seg_2mods{}/subject1'.format(i),
                            session+'/Tumor_predicted_2modalities')]
         substitutions += [('_apply_ts_gtv{}/subject1_trans.nii.gz'.format(i),
-                           session+'/'+'GTV_predicted_reg2CT.nii.gz')]
+                           session+'/'+'GTV_predicted_{}.nii.gz'.format(outname))]
         substitutions += [('_apply_ts_tumor1{}/subject1_trans.nii.gz'.format(i),
-                           session+'/'+'Tumor_predicted_2modalities_reg2CT.nii.gz')]
+                           session+'/'+'Tumor_predicted_2modalities_{}.nii.gz'.format(outname))]
         substitutions += [('_apply_ts_tumor{}/segmentation_trans.nii.gz'.format(i),
-                           session+'/'+'Tumor_predicted_reg2CT.nii.gz')]
+                           session+'/'+'Tumor_predicted_{}.nii.gz'.format(outname))]
         
         substitutions += [('_apply_ts_gtv_t1ref{}/subject1_trans.nii.gz'.format(i),
                            session+'/'+'GTV_predicted_reg2T1ref.nii.gz')]
@@ -197,6 +200,10 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
     workflow.connect(apply_ts_tumor1, 'output_image', datasink,
                      'results.subid.@tumor1_reg2CT')
     if reference:
+        workflow.connect(tumor_seg_2mods, 'output_file', apply_ts_tumor1_t1ref,
+                     'input_image')
+        workflow.connect(tumor_seg, 'out_file', apply_ts_tumor_t1ref, 'input_image')
+        workflow.connect(gtv_seg, 'output_file', apply_ts_gtv_t1ref, 'input_image')
         workflow.connect(apply_ts_gtv_t1ref, 'output_image', datasink,
                          'results.subid.@gtv_reg2T1ref')
         workflow.connect(apply_ts_tumor_t1ref, 'output_image', datasink,
