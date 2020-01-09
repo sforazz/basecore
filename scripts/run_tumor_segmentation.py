@@ -62,7 +62,7 @@ if __name__ == "__main__":
     RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
     CLEAN_CACHE = ARGS.clean_cache
 
-    if os.path.isdir(BASE_DIR):
+    if os.path.isdir(BASE_DIR) and not ARGS.xnat_source:
         sub_list = os.listdir(BASE_DIR)
     elif ARGS.xnat_source:
         sub_list = get_subject_list(
