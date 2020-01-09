@@ -209,7 +209,6 @@ def get_subject_list(project_id, url, user, pwd):
                               proxy='www-int2:80')
 
     xnat_subjects = interface.select.project(project_id).subjects().get()
-    print('Subjects {}'.format(len(xnat_subjects)))
     xnat_sub_labels = [interface.select.project(project_id).subject(x).label()
                        for x in xnat_subjects]
     return xnat_sub_labels

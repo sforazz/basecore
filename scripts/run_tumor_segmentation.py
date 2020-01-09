@@ -70,7 +70,7 @@ if __name__ == "__main__":
             url=ARGS.xnat_url)
 
     for sub_id in sub_list:
-        print(sub_id)
+        print('Processing subject {}'.format(sub_id))
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_registration:
             if ARGS.run_bet:

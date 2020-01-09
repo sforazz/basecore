@@ -56,28 +56,25 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
                 experiment.create(experiments=experiment_type)
             print('New experiment %s created!' %experiment.id())
 
-            for scan in scans:
-    
-                _, scan_name, extention = split_filename(scan)
-                res_format = get_resource_name(scan)
-            #     scan_name = scan.split('/')[-1].split('.')[0]
-                print('Uploading {}...'.format(scan_name))
-                xnat_scan = experiment.scan(scan_name)
-                if not xnat_scan.exists():
-                    done = False
-                    z = 1
-                    while not done:
-                        try:
-                            xnat_scan.create(scans=scan_type)
-                            done = True
-                        except DatabaseError:
-                            print('Same Database error: {} times'.format(z))
-                            z = z+1
-            #                 xnat_scan.create(scans=scan_type)
-                    print('New scan %s created!' %xnat_scan.id())
-                else:
-                    print('Scan %s already in the repository!' %xnat_scan.id())
-                
+        for scan in scans:
+
+            _, scan_name, extention = split_filename(scan)
+            res_format = get_resource_name(scan)
+        #     scan_name = scan.split('/')[-1].split('.')[0]
+            print('Uploading {}...'.format(scan_name))
+            xnat_scan = experiment.scan(scan_name)
+            if not xnat_scan.exists():
+                done = False
+                z = 1
+                while not done:
+                    try:
+                        xnat_scan.create(scans=scan_type)
+                        done = True
+                    except DatabaseError:
+                        print('Same Database error: {} times'.format(z))
+                        z = z+1
+        #                 xnat_scan.create(scans=scan_type)
+                print('New scan %s created!' %xnat_scan.id())
                 resource = xnat_scan.resource(res_format)
                 if not resource.exists():
                     try:
@@ -90,8 +87,11 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
                 xnat_resource = resource.file(scan_name+extention)
                 response = xnat_resource.put(src=scan, format=res_format,
                                              content=res_format, extract=False, overwrite=True)
-        else:
-            print('Experiment %s already in the repository' %experiment.id())
+            else:
+                print('Scan %s already in the repository!' %xnat_scan.id())
+
+#     else:
+#         print('Experiment %s already in the repository' %experiment.id())
 
 
 def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True,
@@ -148,8 +148,14 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                       'taken equal to the session label from XNAT.')
                 session_name = xnat_session.label().split('_')
 
+            print('\nProcessing session {}\n'.format(session_name))
             folder_path = os.path.join(cache_dir, sub_name, session_name)
-            os.makedirs(folder_path)
+            if not os.path.isdir(folder_path):
+                os.makedirs(folder_path)
+            else:
+                print('{} already exists. This might mean that you are trying to '
+                      'restart a job, so I will check for already downloaded resources '
+                      'in order to speed up the process.'.format(folder_path))
             scans = xnat_session.scans().get()
             for scan_id in scans:
                 xnat_scan = xnat_session.scan(scan_id)
@@ -160,19 +166,22 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                     for file_id in files:
                         downloaded = False
                         scan_name = xnat_resource.file(file_id).label()
-                        print('Downloading resource {} ...'.format(scan_name))
-                        while not downloaded:
-                            try:
-                                xnat_resource.file(file_id).get_copy(
-                                    os.path.join(folder_path, scan_name))
-                                downloaded = True
-                            except ConnectionError:
-                                print('Connection lost during download. Try again...')
-                            except:
-                                print('Could not download {0} for session {1} '
-                                      'in subject {2}. Please try again later'
-                                      .format(scan_name, session_name, sub_name))
-                                failed.append([sub_name, session_name, scan_name])
+                        if not os.path.isfile(os.path.join(folder_path, scan_name)):
+                            print('Downloading resource {} ...'.format(scan_name))
+                            while not downloaded:
+                                try:
+                                    xnat_resource.file(file_id).get_copy(
+                                        os.path.join(folder_path, scan_name))
+                                    downloaded = True
+                                except ConnectionError:
+                                    print('Connection lost during download. Try again...')
+                                except:
+                                    print('Could not download {0} for session {1} '
+                                          'in subject {2}. Please try again later'
+                                          .format(scan_name, session_name, sub_name))
+                                    failed.append([sub_name, session_name, scan_name])
+                        else:
+                            print('{} already downloaded, skiping it.'.format(scan_name))
     if failed:
         with open(cache_dir+'/failed_download.txt', 'w') as f:
             for line in failed:
