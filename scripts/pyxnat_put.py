@@ -21,6 +21,9 @@ if __name__ == "__main__":
                         help=('The username on the server must be provided here.'))
     PARSER.add_argument('--xnat-pwd', '-xpwd', type=str,
                         help=('The password on the server must be provided here.'))
+    PARSER.add_argument('--processed', '-p', action='store_true',
+                        help=('Whether or not the folder to upload should go to a processed'
+                              ' session. Default is False.'))
 
     ARGS = PARSER.parse_args()
     print('Uploading the results to XNAT with the following parameters:')
@@ -28,5 +31,5 @@ if __name__ == "__main__":
     print('Project ID: {}'.format(ARGS.xnat_pid))
     print('User ID: {}'.format(ARGS.xnat_user))
     
-    put(ARGS.xnat_pid, ARGS.sub_id, ARGS.session, ARGS.input_folder, url=ARGS.xnat_url,
+    put(ARGS.xnat_pid, ARGS.sub_id, ARGS.session_id, ARGS.input_folder, url=ARGS.xnat_url,
         pwd=ARGS.xnat_pwd, user=ARGS.xnat_user, processed=ARGS.processed)
