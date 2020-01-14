@@ -9,7 +9,7 @@ if __name__ == "__main__":
                         help=('Folder to upload to XNAT.'))
     PARSER.add_argument('--sub-id', type=str,
                         help=('Subject ID on XNAT.'))
-    PARSER.add_argument('--sessions-id', nargs='+', type=str,
+    PARSER.add_argument('--session-ids', nargs='+', type=str,
                         help=('Session ID on XNAT.'))
     PARSER.add_argument('--xnat-url', '-xurl', type=str, default='https://central.xnat.org',
                         help=('The url of the server must be provided here. '
@@ -31,5 +31,5 @@ if __name__ == "__main__":
     print('Project ID: {}'.format(ARGS.xnat_pid))
     print('User ID: {}'.format(ARGS.xnat_user))
     
-    put(ARGS.xnat_pid, ARGS.sub_id, ARGS.session_id, ARGS.input_folder, url=ARGS.xnat_url,
+    put(ARGS.xnat_pid, ARGS.sub_id, ARGS.session_ids, ARGS.input_folder, url=ARGS.xnat_url,
         pwd=ARGS.xnat_pwd, user=ARGS.xnat_user, processed=ARGS.processed)
