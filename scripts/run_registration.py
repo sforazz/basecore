@@ -64,6 +64,11 @@ if __name__ == "__main__":
                                 'results')
     sub_list = os.listdir(BASE_DIR)
 
+    print('Number of subjects: {}'.format(len(sub_list)))
+    processed = os.listdir(RESULT_DIR+'/results')
+    sub_list = [x for x in sub_list if x not in processed]
+    print('Number of subjects without processed: {}'.format(len(sub_list)))
+
     for sub_id in sub_list:
         ready = False
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
