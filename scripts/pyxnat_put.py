@@ -9,7 +9,7 @@ if __name__ == "__main__":
                         help=('Folder to upload to XNAT.'))
     PARSER.add_argument('--sub-id', type=str,
                         help=('Subject ID on XNAT.'))
-    PARSER.add_argument('--session-id', type=str,
+    PARSER.add_argument('--sessions-id', nargs='+', type=str,
                         help=('Session ID on XNAT.'))
     PARSER.add_argument('--xnat-url', '-xurl', type=str, default='https://central.xnat.org',
                         help=('The url of the server must be provided here. '
