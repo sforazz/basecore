@@ -9,9 +9,9 @@ from nipype.interfaces.dcm2nii import Dcm2niix
 contrasts = ['T1', 'FLAIR', 'CT1', 'T2']
 rt_files = ['RTCT', 'RTSTRUCT', 'RTDOSE', 'RTPLAN']
 ct_files = ['CT']
-base_dir = '/media/fsforazz/portable_hdd/GBM_4sequences'
-result_dir = '/mnt/sdb/GBM_4sequences_sorted'
-cache_dir = '/mnt/sdb/GBM_4sequences_sorted_cache'
+base_dir = '/mnt/sdb/debugging_workflow'
+result_dir = '/mnt/sdb/debugging_workflow_out'
+cache_dir = '/mnt/sdb/debugging_workflow_cache'
 
 if not os.path.isdir(result_dir):
     os.mkdir(result_dir)
@@ -79,8 +79,8 @@ check = nipype.MapNode(interface=ConversionCheck(),
                        name='check_conversion')
 
 check_ct = nipype.MapNode(interface=ConversionCheck(),
-                       iterfield=['in_file', 'file_name'],
-                       name='check_conversion_ct')
+                          iterfield=['in_file', 'file_name'],
+                          name='check_conversion_ct')
 
 workflow = nipype.Workflow('data_preparation_workflow', base_dir=cache_dir)
 workflow.connect(inputnode, 'contrasts', datasource, 'contrasts')
@@ -99,7 +99,7 @@ workflow.connect(dc_ct, 'scan_name', check_ct, 'file_name')
 workflow.connect(converter_ct, 'converted_files', check_ct, 'in_file')
 workflow.connect(converter, 'converted_files', check, 'in_file')
 
-# workflow.run()
-workflow.run('MultiProc', plugin_args={'n_procs': 8})
+workflow.run()
+# workflow.run('MultiProc', plugin_args={'n_procs': 8})
 
 print('Done!')
