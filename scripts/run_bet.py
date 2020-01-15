@@ -2,7 +2,8 @@
 import os
 import argparse
 import shutil
-from basecore.workflows.datahandler import gbm_datasource
+from basecore.workflows.datahandler import gbm_datasource,\
+    cinderella_tp0_datasource
 from basecore.workflows.bet import brain_extraction
 
 
@@ -19,6 +20,10 @@ if __name__ == "__main__":
                               'when you are sure that the workflow is running properly '
                               'otherwise it will always restart from scratch. '
                               'Default False.'))
+    PARSER.add_argument('--single-tp', '-s', action='store_true',
+                        help=('Whether or not to run bet for single time point or for multi '
+                              'timepoints project.'
+                              'Default multi-timepoints.'))
 
     ARGS = PARSER.parse_args()
 
@@ -33,9 +38,13 @@ if __name__ == "__main__":
 
     for sub_id in sub_list:
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
+        if ARGS.single_tp:
+            datasource, sessions, reference = cinderella_tp0_datasource(sub_id, BASE_DIR)
+        else:
+            datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
         workflow = brain_extraction(
-            sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
+            sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference,
+            t10= not ARGS.single_tp)
         workflow.run(plugin='Linear')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)

@@ -1,12 +1,11 @@
-"Script to run image registration for the temporal GBM analysis"
+"Script to run image registration for single tp Cinderella analysis"
 import os
 import argparse
 import shutil
 from basecore.workflows.datahandler import (
-    gbm_datasource, registration_datasource, xnat_datasink)
+    xnat_datasink, cinderella_tp0_datasource, single_tp_registration_datasource)
 from basecore.workflows.bet import brain_extraction
-from basecore.workflows.registration import longitudinal_registration
-import time
+from basecore.workflows.registration import single_tp_registration
 
 
 if __name__ == "__main__":
@@ -64,25 +63,27 @@ if __name__ == "__main__":
                                 'results')
     sub_list = os.listdir(BASE_DIR)
 
-    print('Number of subjects: {}'.format(len(sub_list)))
-    processed = os.listdir(RESULT_DIR+'/results')
-    sub_list = [x for x in sub_list if x not in processed]
-    print('Number of subjects without processed: {}'.format(len(sub_list)))
+    if os.path.isdir(RESULT_DIR+'/results'):
+        print('Number of subjects: {}'.format(len(sub_list)))
+        processed = os.listdir(RESULT_DIR+'/results')
+        sub_list = [x for x in sub_list if x not in processed]
+        print('Number of subjects without processed: {}'.format(len(sub_list)))
 
     for sub_id in sub_list:
         ready = False
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_bet:
-            datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
+            datasource, sessions, reference = cinderella_tp0_datasource(sub_id, BASE_DIR)
             bet_workflow = brain_extraction(
                 sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE,
-                reference)
+                reference, t10=False)
+            CORES = 0
         else:
-            datasource, sessions, reference = registration_datasource(
+            datasource, sessions, reference = single_tp_registration_datasource(
                 sub_id, BASE_DIR)
             bet_workflow = None
 
-        workflow = longitudinal_registration(
+        workflow = single_tp_registration(
             sub_id, datasource, sessions, reference, RESULT_DIR,
             NIPYPE_CACHE, bet_workflow=bet_workflow)
 
@@ -94,15 +95,6 @@ if __name__ == "__main__":
                   .format(CORES))
             workflow.run('MultiProc', plugin_args={'n_procs': CORES})
 
-        while not ready:
-            if not os.path.isdir('/nfs/extra_hd/result2upload/ready'):
-                shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
-                                '/nfs/extra_hd/result2upload/{}'.format(sub_id))
-                os.mkdir('/nfs/extra_hd/result2upload/ready')
-                ready = True
-            else:
-                print('Old results are still in the folder, wait 1 minute...')
-                time.sleep(60)
         if ARGS.xnat_sink:
             print('Uploading the results to XNAT with the following parameters:')
             print('Server: {}'.format(ARGS.xnat_url))

@@ -160,8 +160,8 @@ class DicomCheck(BaseInterface):
             list of DICOMS files
         """
         if len(im_types) > 1:
-            im_type = list([x for x in im_types if not
-                            'PROJECTION IMAGE' in x][0])
+            im_type = list([x for x in im_types if not 'PROJECTION IMAGE' in x
+                            and 'LOCALIZER' not in x][0])
 
             dcms = [x for x in dicoms if pydicom.read_file(str(x)).ImageType==im_type]
         elif len(series_nums) > 1:

@@ -1,12 +1,12 @@
 import os
 import argparse
 import shutil
-from basecore.workflows.registration import longitudinal_registration
-from basecore.workflows.segmentation import tumor_segmentation
+from basecore.workflows.registration import single_tp_registration
+from basecore.workflows.segmentation import single_tp_tumor_segmentation
 from basecore.workflows.bet import brain_extraction
 from basecore.workflows.datahandler import (
-    gbm_datasource, segmentation_datasource, registration_datasource,
-    xnat_datasink)
+    xnat_datasink, single_tp_registration_datasource, cinderella_tp0_datasource,
+    single_tp_segmentation_datasource)
 from basecore.database.pyxnat import get
 from basecore.database.base import get_subject_list
 
@@ -81,28 +81,28 @@ if __name__ == "__main__":
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
         if ARGS.run_registration:
             if ARGS.run_bet:
-                datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
+                datasource, sessions, reference = cinderella_tp0_datasource(sub_id, BASE_DIR)
                 bet_workflow = brain_extraction(
-                    sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
+                    sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference,
+                    t10=False)
             else:
-                datasource, sessions = registration_datasource(
+                datasource, sessions = single_tp_registration_datasource(
                     sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
                 bet_workflow = None
 
-            reg_workflow = longitudinal_registration(
+            reg_workflow = single_tp_registration(
                 sub_id, datasource, sessions, reference, RESULT_DIR,
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
             if ARGS.xnat_source:
-                
                 get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
                     url=ARGS.xnat_url, processed=True, subjects=[sub_id])
-            datasource, sessions, reference = segmentation_datasource(
+            datasource, sessions, reference = single_tp_segmentation_datasource(
                 sub_id, BASE_DIR)
             reg_workflow = None
             bet_workflow = None
 
-        seg_workflow = tumor_segmentation(
+        seg_workflow = single_tp_tumor_segmentation(
             datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
             ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reference,
             reg_workflow=reg_workflow, bet_workflow=bet_workflow)
