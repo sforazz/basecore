@@ -8,7 +8,7 @@ from basecore.workflows.datahandler import SEQUENCES, datasink_base
 
 
 def longitudinal_registration(sub_id, datasource, sessions, reference,
-                              RESULT_DIR, NIPYPE_CACHE, bet_workflow=None):
+                              result_dir, nipype_cache, bet_workflow=None):
     """
     This is a workflow to register multi-modalities MR (T2, T1KM, FLAIR) to their 
     reference T1 image, in multiple time-points cohort. In particular, for each 
@@ -104,7 +104,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     # to have the same number if matrices as input in mapnode
     fake_merge = nipype.Node(interface=Merge(len(sessions)), name='fake_merge')
 
-    datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
+    datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
 
     substitutions = [('subid', sub_id)]
     for i, session in enumerate(sessions):
@@ -140,7 +140,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
 
     datasink.inputs.substitutions =substitutions
     # Create Workflow
-    workflow = nipype.Workflow('registration_workflow', base_dir=NIPYPE_CACHE)
+    workflow = nipype.Workflow('registration_workflow', base_dir=nipype_cache)
 
     for i, reg in enumerate(reg_nodes):
         workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
@@ -229,7 +229,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
 
 
 def single_tp_registration(sub_id, datasource, session, reference,
-                           RESULT_DIR, NIPYPE_CACHE, bet_workflow=None):
+                           result_dir, nipype_cache, bet_workflow=None):
     """
     This is a workflow to register multi-modalities MR (T2, T1KM, FLAIR) to their 
     reference T1 image, in one single time-point cohort. In particular, for each 
@@ -282,7 +282,7 @@ def single_tp_registration(sub_id, datasource, session, reference,
             merge.inputs.ravel_inputs = True
             merge_nodes.append(merge)
 
-    datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
+    datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
 
     substitutions = [('subid', sub_id)]
     substitutions += [('session', session)]
@@ -307,7 +307,7 @@ def single_tp_registration(sub_id, datasource, session, reference,
 
     datasink.inputs.substitutions =substitutions
     # Create Workflow
-    workflow = nipype.Workflow('registration_workflow', base_dir=NIPYPE_CACHE)
+    workflow = nipype.Workflow('registration_workflow', base_dir=nipype_cache)
 
     for i, reg in enumerate(reg_nodes):
         workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
@@ -320,7 +320,7 @@ def single_tp_registration(sub_id, datasource, session, reference,
         for i, node in enumerate(apply_ts_nodes):
             workflow.connect(apply_mask_nodes[i], 'out_file', node, 'input_image')
             workflow.connect(datasource, 'reference', node, 'reference_image')
-            workflow.connect(merge_nodes[i], 'out', node, 'transforms')
+            workflow.connect(regT12CT, 'regmat', node, 'transforms')
             workflow.connect(node, 'output_image', datasink,
                              'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
 
