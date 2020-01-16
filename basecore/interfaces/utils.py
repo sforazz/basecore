@@ -10,9 +10,13 @@ import shutil
 import os
 import nibabel as nib
 import glob
+from basecore.utils.filemanip import split_filename
 
 
-RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN']
+RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
+POSSIBLE_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'T1KM', 'FLAIR',
+                  'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM', 'CT1',
+                  'RTCT']
 
 
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
@@ -38,30 +42,43 @@ class DicomCheck(BaseInterface):
         dicom_dir = self.inputs.dicom_dir
         wd = self.inputs.working_dir
 
-        sub_name = dicom_dir.split('/')[-4]
-        tp = dicom_dir.split('/')[-3]
-        scan_name = dicom_dir.split('/')[-2]
+        img_paths = dicom_dir.split('/')
+        scan_name = list(set(POSSIBLE_NAMES).intersection(img_paths))[0]
+        name_index = img_paths.index(scan_name)
+        tp = img_paths[name_index-1]
+        sub_name = img_paths[name_index-2]
+#         tp = dicom_dir.split('/')[-3]
+#         tp = ''
+#         scan_name = dicom_dir.split('/')[-1]
         if scan_name in RT_NAMES:
-            dicoms = sorted(glob.glob(dicom_dir+'/*.dcm'))
-            if scan_name == 'RTDOSE':
-                dose_type = dicom_dir.split('/')[-1].split('_')[0][2:]
-                scan_name = scan_name+'/'+dose_type
-        else:
-            dicoms, im_types, series_nums = self.dcm_info()
-            dicoms = self.dcm_check(dicoms, im_types, series_nums)
-        if dicoms:
             if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
             else:
                 shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
-            for d in dicoms:
-                shutil.copy2(d, os.path.join(wd, sub_name, tp, scan_name))
-            self.outdir = os.path.join(wd, sub_name, tp, scan_name)
-            self.scan_name = scan_name
-            self.base_dir = os.path.join(wd, sub_name, tp)
+            files = sorted(os.listdir(dicom_dir))
+            for item in files:
+                curr_item = os.path.join(dicom_dir, item)
+                if os.path.isdir(curr_item):
+                    shutil.copytree(curr_item, os.path.join(wd, sub_name, tp, scan_name, item))
+                else:
+                    shutil.copy2(curr_item, os.path.join(wd, sub_name, tp, scan_name))
+        else:
+            dicoms, im_types, series_nums = self.dcm_info()
+            dicoms = self.dcm_check(dicoms, im_types, series_nums)
+            if dicoms:
+                if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
+                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                else:
+                    shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
+                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                for d in dicoms:
+                    shutil.copy2(d, os.path.join(wd, sub_name, tp, scan_name))
+        self.outdir = os.path.join(wd, sub_name, tp, scan_name)
+        self.scan_name = scan_name
+        self.base_dir = os.path.join(wd, sub_name, tp)
         return runtime
-    
+
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs['outdir'] = self.outdir
@@ -69,7 +86,7 @@ class DicomCheck(BaseInterface):
         outputs['base_dir'] = self.base_dir
 
         return outputs
-    
+
     def dcm_info(self):
         """Function to extract information from a list of DICOM files in one folder. It returns a list of
         unique image types and scan numbers found in the input list of DICOMS.
@@ -120,9 +137,9 @@ class DicomCheck(BaseInterface):
         if toRemove:
             for f in toRemove:
                 dicoms.remove(f)
-        
+
         return dicoms, list(set(ImageTypes)), list(set(SeriesNums))
-    
+
     def dcm_check(self, dicoms, im_types, series_nums):
         """Function to check the DICOM files in one folder. It is based on the glioma test data.
         This function checks the type of the image (to exclude those that are localizer acquisitions)
@@ -143,21 +160,21 @@ class DicomCheck(BaseInterface):
             list of DICOMS files
         """
         if len(im_types) > 1:
-            im_type = list([x for x in im_types if not
-                            'PROJECTION IMAGE' in x][0])
-    
+            im_type = list([x for x in im_types if not 'PROJECTION IMAGE' in x
+                            and 'LOCALIZER' not in x][0])
+
             dcms = [x for x in dicoms if pydicom.read_file(str(x)).ImageType==im_type]
         elif len(series_nums) > 1:
             series_num = np.max(series_nums)
             dcms = [x for x in dicoms if pydicom.read_file(str(x)).SeriesNumber==series_num]
         else:
             dcms = dicoms
-        
+
         return [str(x) for x in dcms]
 
 
 class ConversionCheckInputSpec(BaseInterfaceInputSpec):
-    
+
     in_file = InputMultiPath(File(), desc='(List of) file that'
                              ' needs to be checked after DICOM to NIFTI conversion')
     file_name = traits.Str(desc='Name that the converted file has to match'
@@ -165,15 +182,15 @@ class ConversionCheckInputSpec(BaseInterfaceInputSpec):
 
 
 class ConversionCheckOutputSpec(TraitedSpec):
-    
+
     out_file = traits.Str()
 
 
 class ConversionCheck(BaseInterface):
-    
+
     input_spec = ConversionCheckInputSpec
     output_spec = ConversionCheckOutputSpec
-    
+
     def _run_interface(self, runtime):
 
         converted = self.inputs.in_file
@@ -185,7 +202,8 @@ class ConversionCheck(BaseInterface):
         if len(extra) == len(converted):
             if len(extra) == 2 and scan_name == 'T2':
                 to_remove.append(extra[0])
-                os.rename(extra[1], os.path.join(base_dir, 'T2.nii.gz'))
+                if not os.path.isfile(os.path.join(base_dir, 'T2.nii.gz')):
+                    shutil.copy2(extra[1], os.path.join(base_dir, 'T2.nii.gz'))
                 converted = [os.path.join(base_dir, 'T2.nii.gz')]
             else:
                 to_remove += extra
@@ -193,10 +211,10 @@ class ConversionCheck(BaseInterface):
         else:
             to_remove += extra
 
-        if to_remove:
-            for f in to_remove:
-                if os.path.isfile(f):
-                    os.remove(f)
+#         if to_remove:
+#             for f in to_remove:
+#                 if os.path.isfile(f):
+#                     os.remove(f)
 
         if scan_name != 'CT':
             if os.path.isdir(os.path.join(base_dir, '{}'.format(scan_name))):
@@ -208,21 +226,24 @@ class ConversionCheck(BaseInterface):
                 ref = nib.load(self.converted)
                 data = ref.get_data()
                 if len(data.squeeze().shape) == 2 or len(data.squeeze().shape) > 4:
-                    os.remove(self.converted)
+                    if os.path.isfile(self.converted):
+                        os.remove(self.converted)
                 elif len(data.squeeze().shape) == 4:
                     im2save = nib.Nifti1Image(data[:, :, :, 0], affine=ref.affine)
                     nib.save(im2save, self.converted)
                 elif len(data.dtype) > 0:
                     print('{} is not a greyscale image. It will be deleted.'.format(self.converted))
-                    os.remove(self.converted)
+                    if os.path.isfile(self.converted):
+                        os.remove(self.converted)
             except:
                 print('{} failed to save with nibabel. It will be deleted.'.format(self.converted))
-                os.remove(self.converted)
+                if os.path.isfile(self.converted):
+                    os.remove(self.converted)
             if os.path.isfile(self.converted):
                 self.converted = self.converted
         else:
             self.converted = None
-        
+
         if self.inputs.in_file and self.converted is None:
             with open(os.path.join(base_dir, 'corrupeted_scans.txt'), 'a') as f:
                 f.write('{}'.format(scan_name))
@@ -274,5 +295,43 @@ class RemoveRTFiles(BaseInterface):
         outputs['source_dir'] = self.source_dir
         outputs['out_filename'] = self.out_filename
         outputs['output_dir'] = self.output_dir
+
+        return outputs
+
+
+class NNUnetPreparationInputSpec(BaseInterfaceInputSpec):
+
+    images = traits.List(mandatory=True, desc='List of images to be prepared before'
+                         ' running the nnUNet inference.')
+
+
+class NNUnetPreparationOutputSpec(TraitedSpec):
+
+    output_folder = Directory(exists=True, desc='Output folder prepared for nnUNet.')
+
+
+class NNUnetPreparation(BaseInterface):
+
+    input_spec = NNUnetPreparationInputSpec
+    output_spec = NNUnetPreparationOutputSpec
+
+    def _run_interface(self, runtime):
+
+        images = self.inputs.images
+        if images:
+            new_dir = os.path.abspath('data_prepared')
+            os.mkdir(os.path.abspath('data_prepared'))
+            for i, image in enumerate(images):
+                _, _, ext = split_filename(image)
+                shutil.copy2(image, os.path.join(
+                    new_dir,'subject1_{}'.format(str(i).zfill(4))+ext))
+        else:
+            raise Exception('No images provided!Please check.')
+
+        return runtime
+
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['output_folder'] = os.path.abspath('data_prepared')
 
         return outputs

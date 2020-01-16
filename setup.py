@@ -23,7 +23,9 @@ setup(name='basecore',
       'python-dateutil==2.7.5',
       'pytz==2018.9',
       'six==1.12.0',
-      'nipype==1.2.0'
+      'nipype==1.2.0',
+      'xnat==0.3.21',
+      'pyxnat==1.2.1.0.post3'
       ],
       packages=find_packages(exclude=['*.tests', '*.tests.*', 'tests.*', 'tests']),
       classifiers=[

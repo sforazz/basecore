@@ -4,12 +4,20 @@ from nipype.interfaces.ants.base import ANTSCommand, ANTSCommandInputSpec
 import os.path as op
 from nipype.interfaces.base import isdefined
 from nipype.interfaces.base.traits_extension import InputMultiPath
+import os
+
+
+BASH_PATH = os.path.abspath(os.path.join(os.path.split(__file__)[0],
+                                         os.pardir, os.pardir, 'bash'))
 
 
 class AntsRegSynInputSpec(CommandLineInputSpec):
 
     _trans_types = ['t', 'r', 'a', 's', 'sr', 'so', 'b', 'br', 'bo']
     _precision_types = ['f', 'd']
+    _interp_type = ['Linear', 'NearestNeighbor', 'BSpline',
+                    'CosineWindowedSinc', 'WelchWindowedSinc',
+                    'HammingWindowedSinc']
     input_file = File(mandatory=True, desc='existing input image',
                       argstr='-m %s', exists=True)
     ref_file = File(mandatory=True, desc='existing reference image',
@@ -39,6 +47,10 @@ class AntsRegSynInputSpec(CommandLineInputSpec):
         '(default = d). f:float, d:double')
     use_histo_match = traits.Int(desc='use histogram matching (default = 0).'
                                  '0: False, 1:True', argstr='-j %s')
+    interpolation = traits.Enum(
+        *_interp_type, argstr='-l %s',
+        desc='type of interpolation. Linear, NearestNeighbor, BSpline, '
+             'CosineWindowedSinc, WelchWindowedSinc, HammingWindowedSinc')
 
 
 class AntsRegSynOutputSpec(TraitedSpec):
@@ -50,7 +62,7 @@ class AntsRegSynOutputSpec(TraitedSpec):
 
 class AntsRegSyn(CommandLine):
 
-    _cmd = 'antsRegistrationSyN.sh'
+    _cmd = os.path.join(BASH_PATH, 'antsRegistrationSyN.sh')
     input_spec = AntsRegSynInputSpec
     output_spec = AntsRegSynOutputSpec
 
@@ -73,7 +85,7 @@ class AntsRegSyn(CommandLine):
 
 
 class ResampleImageInputSpec(ANTSCommandInputSpec):
-    
+
     dimensions = traits.Enum(3, 2, argstr='%d', usedefault=True, position=0,
                              desc='image dimension (2 or 3)')
     in_file = File(exists=True, mandatory=True, desc='Image to resample',

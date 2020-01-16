@@ -2,6 +2,7 @@ import glob
 import os
 import nipype
 from basecore.interfaces.mitk import Voxelizer, CLGlobalFeatures
+from nipype.interfaces.utility import Select
 
 
 def creste_sub_list(basedir):
@@ -25,8 +26,8 @@ def creste_sub_list(basedir):
     return data
 
 base_dir = '/mnt/sdb/anal_sorted/'
-cache_dir = '/mnt/sdb/feat_cache'
-result_dir = '/mnt/sdb/anal_fe'
+cache_dir = '/mnt/sdb/feat_cache1'
+result_dir = '/mnt/sdb/anal_fe1'
 sub_list = creste_sub_list(base_dir)
 
 datasource = nipype.Node(
@@ -47,6 +48,9 @@ voxelizer = nipype.MapNode(interface=Voxelizer(), iterfield=['reference', 'struc
 voxelizer.inputs.regular_expression = '.*PTV.*'
 voxelizer.inputs.multi_structs = True
 voxelizer.inputs.binarization = True
+
+select = nipype.MapNode(interface=Select(), iterfield=['inlist'], name='select')
+select.inputs.index = 0
 
 features = nipype.MapNode(interface=CLGlobalFeatures(), iterfield=['in_file', 'mask'],
                            name='features_extraction')
@@ -71,7 +75,8 @@ workflow = nipype.Workflow('features_extraction_workflow', base_dir=cache_dir)
 workflow.connect(datasource, 'ct', voxelizer, 'reference')
 workflow.connect(datasource, 'rtstruct', voxelizer, 'struct_file')
 workflow.connect(datasource, 'ct', features, 'in_file')
-workflow.connect(voxelizer, 'out_files', features, 'mask')
+workflow.connect(voxelizer, 'out_files', select, 'inlist')
+workflow.connect(select, 'out', features, 'mask')
 workflow.connect(features, 'out_file', datasink, 'features_extraction.@csv_file')
 
 workflow.run()

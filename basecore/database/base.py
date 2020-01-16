@@ -13,9 +13,10 @@ from xnat.exceptions import XNATResponseError
 from .exceptions import (
     XnatUtilsLookupError, XnatUtilsUsageError, XnatUtilsKeyError,
     XnatUtilsNoMatchingSessionsException,
-    XnatUtilsSkippedAllSessionsException)
+    XnatUtilsSkippedAllSessionsException, XnatUtilsError)
 import warnings
 import logging
+from pyxnat import Interface
 
 
 logger = logging.getLogger('xnat-utils')
@@ -50,13 +51,13 @@ sanitize_re = re.compile(r'[^a-zA-Z_0-9]')
 # TODO: Need to add other illegal chars here
 illegal_scan_chars_re = re.compile(r'\.')
 
-session_modality_re = re.compile(r'\w+_\w+_([A-Z]+)\d+')
+session_modality_re = re.compile(r'\w+_\w+_(MR|CT|RT)(\d+|\w+)')
 
 server_name_re = re.compile(r'(http://|https://)?([\w\-\.]+).*')
 
 
-def connect(user=None, password=None, loglevel='ERROR', connection=None, server=None,
-            use_netrc=True, failures=0):
+def connect(server=None, user=None, loglevel='ERROR', connection=None,
+            use_netrc=True, failures=0, password=None):
     """
     Opens a connection to MBI-XNAT
 
@@ -83,6 +84,9 @@ def connect(user=None, password=None, loglevel='ERROR', connection=None, server=
     use_netrc : bool
         Whether to load and save user credentials from netrc file
         located at $HOME/.netrc
+    password : str
+        Password provided to login. Will be ignored unless 'user' and 'server'
+        are not also provided
     Returns
     -------
     connection : xnat.Session
@@ -90,44 +94,59 @@ def connect(user=None, password=None, loglevel='ERROR', connection=None, server=
     """
     if connection is not None:
         return WrappedXnatSession(connection)
-    netrc_path = os.path.join(os.path.expanduser('~'), '.netrc')
-    save_netrc = False
-#     password = None
-    if use_netrc:
-        try:
-            saved_servers = netrc.netrc(netrc_path).hosts
-        except Exception:
-            saved_servers = {}
+    netrc_path = os.path.join(os.path.expanduser('~'),
+                              ('.netrc' if os.name != 'nt' else '_netrc'))
+    netrc_match = False
+    # Extract server name from netrc file if 'use_netrc' flag is set and either
+    # the server is not provided or it doesn't include the protocol (in which
+    # case it will be considered as a potential name fragment)
+    if use_netrc and os.path.exists(netrc_path):
+        # Read netrc file and return the server addresses saved within it
+        with open(netrc_path) as f:
+            lines = f.read().split('\n')
+        server_names = []
+        for line in lines:
+            if line.startswith('machine'):
+                server_names.append(line.split()[-1])
+        if not server_names:
+            raise XnatUtilsError(
+                "Malformed Netrc file ({}), please delete or flag "
+                "use_netrc==False")
+        if server is None:
+            # Default to the first saved server
+            server = server_names[0]
+            netrc_match = True
+        else:
+            # Check whether the provided server name is in the netrc or not
+            protocol, dn = server_name_re.match(server).groups()
+            # If protocol (e.g. http://) is included in server name, treat as
+            # a complete domain name
+            if protocol is not None:
+                netrc_match = dn in server_names
+            # Otherwise treat domain name as a potential fragment that can
+            # match any of the save servers
+            else:
+                matches = [s for s in server_names if dn in s]
+                if len(matches) == 1:
+                    server = matches[0]
+                    netrc_match = True
+                elif len(matches) > 1:
+                    raise XnatUtilsUsageError(
+                        "Given server name (or part thereof) '{}' matches "
+                        "multiple servers in ~/.netrc file ('{}')".format(
+                            server, "', '".join(matches)))
+        saved_servers = netrc.netrc().hosts
     else:
         saved_servers = {}
-    if server is None and saved_servers:
-        # Get default server from first line in netrc file
-        with open(netrc_path) as f:
-            server = f.readline().split()[-1]
-    else:
-        matches = [s for s in saved_servers if server in s]
-        if len(matches) == 1:
-            server = matches[0]
-        elif len(matches) > 1:
-            raise XnatUtilsUsageError(
-                "Given server name (or part thereof) '{}' matches "
-                "multiple servers in ~/.netrc file ('{}')".format(
-                    server, "', '".join(matches)))
-        else:
-            if server is None:
-                server = input('XNAT server URL: ')
-            # A little hack to avoid issues with the redirection
-            # from monash.edu to monash.edu.au
-            if server.endswith('monash.edu'):
-                server += '.au'
-            if user is None:
-                user = input("XNAT username for '{}': ".format(server))
-            if password is None:
-                password = getpass.getpass()
-            if use_netrc:
-                save_netrc = True
-    # Ensure that the protocol is added to the server URL
-    # FIXME: Should be able to handle http:// protocols as well.
+    if server is None:
+        server = input(
+            'XNAT server domain name (e.g. mbi-xnat.erc.monash.edu.au): ')
+    if not netrc_match:
+        if user is None:
+            user = input("XNAT username for '{}': ".format(server))
+        if password is None:
+            password = getpass.getpass()
+    # Prepend default HTTP protcol if protocol is not present
     if server_name_re.match(server).group(1) is None:
         server = 'http://' + server
     kwargs = {'user': user, 'password': password}
@@ -150,11 +169,12 @@ def connect(user=None, password=None, loglevel='ERROR', connection=None, server=
             logger.warning(msg)
             try:
                 del saved_servers[server_name_re.match(server).group(2)]
+            except KeyError:
+                pass
+            else:
                 write_netrc(netrc_path, saved_servers)
                 logger.warning("Removed saved credentials for {}..."
                                .format(server))
-            except KeyError:
-                pass
             if failures < 3:
                 return connect(server=server, loglevel=loglevel,
                                connection=connection,
@@ -166,7 +186,7 @@ def connect(user=None, password=None, loglevel='ERROR', connection=None, server=
                     "blocked for 1 hour. Please contact "
                     "your administrator to reset.".format(user))
         else:
-            if save_netrc:
+            if use_netrc and not netrc_match:
                 alias, secret = connection.services.issue_token()
                 # Strip protocol (i.e. https://) from server
                 server_name = server_name_re.match(server).group(2)
@@ -181,6 +201,17 @@ def connect(user=None, password=None, loglevel='ERROR', connection=None, server=
                     "the '--no_netrc' or '-n' option".format(
                         server, netrc_path))
     return connection
+
+
+def get_subject_list(project_id, url, user, pwd):
+
+    interface = Interface(server=url, user=user, password=pwd,
+                              proxy='www-int2:80')
+
+    xnat_subjects = interface.select.project(project_id).subjects().get()
+    xnat_sub_labels = [interface.select.project(project_id).subject(x).label()
+                       for x in xnat_subjects]
+    return xnat_sub_labels
 
 
 def write_netrc(netrc_path, servers):
@@ -341,7 +372,6 @@ def matching_sessions(login, session_ids, with_scans=None,
         without_scans = ()
 
     def valid(session):
-        print('Session date: {}'.format(session.date))
         if before is not None and session.date > before:
             return False
         if after is not None and session.date < after:
@@ -512,5 +542,5 @@ def print_response_error(e):
 
 class DummyContext(object):
 
-    def __exit__(self):
+    def __exit__(self, *args):
         pass
