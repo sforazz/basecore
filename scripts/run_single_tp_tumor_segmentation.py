@@ -9,6 +9,7 @@ from basecore.workflows.datahandler import (
     single_tp_segmentation_datasource)
 from basecore.database.pyxnat import get
 from basecore.database.base import get_subject_list
+from basecore.utils.utils import Password
 
 
 if __name__ == "__main__":
@@ -48,7 +49,8 @@ if __name__ == "__main__":
                               'the results must be provided here.'))
     PARSER.add_argument('--xnat-user', '-xuser', type=str,
                         help=('If xnat-sink, the username on the server must be provided here.'))
-    PARSER.add_argument('--xnat-pwd', '-xpwd', type=str,
+    PARSER.add_argument('--xnat-pwd', '-xpwd', action=Password, dest='Please type your XNAT password: ',
+                        nargs='?', type=str,
                         help=('If xnat-sink, the password on the server must be provided here.'))
 
     ARGS = PARSER.parse_args()
