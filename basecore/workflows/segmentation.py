@@ -73,10 +73,12 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
     gtv_seg = nipype.MapNode(interface=NNUnetInference(), iterfield=['input_folder'],
                              name='gtv_segmentation')
     gtv_seg.inputs.model_folder = gtv_model
+    gtv_seg.inputs.prefix = 'gtv'
 
     tumor_seg_2mods = nipype.MapNode(interface=NNUnetInference(), iterfield=['input_folder'],
                              name='tumor_seg_2mods')
     tumor_seg_2mods.inputs.model_folder = tumor_model
+    tumor_seg_2mods.inputs.prefix = 'tumor_2mod'
 
     datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
 
@@ -86,7 +88,11 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         substitutions += [('_tumor_segmentation{}/'.format(i), session+'/')]
         substitutions += [('_gtv_segmentation{}/subject1'.format(i),
                            session+'/GTV_predicted')]
+        substitutions += [('nnunet_inference_gtv/subject1'.format(i),
+                           session+'/GTV_predicted')]
         substitutions += [('_tumor_seg_2mods{}/subject1'.format(i),
+                           session+'/Tumor_predicted_2modalities')]
+        substitutions += [('nnunet_inference_tumor_2mod/subject1'.format(i),
                            session+'/Tumor_predicted_2modalities')]
         substitutions += [('_apply_ts_gtv{}/subject1_trans.nii.gz'.format(i),
                            session+'/'+'GTV_predicted_{}.nii.gz'.format(outname))]
@@ -318,10 +324,11 @@ def single_tp_tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                      tumor_seg_2mods, 'input_folder')
 
     # Nodes to normalize segmentations to CT space
-    workflow.connect(gtv_seg, 'output_file', apply_ts_gtv, 'input_image')
-    workflow.connect(tumor_seg_2mods, 'output_file', apply_ts_tumor1,
-                     'input_image')
-    workflow.connect(tumor_seg, 'out_file', apply_ts_tumor, 'input_image')
+    if reference:
+        workflow.connect(gtv_seg, 'output_file', apply_ts_gtv, 'input_image')
+        workflow.connect(tumor_seg_2mods, 'output_file', apply_ts_tumor1,
+                         'input_image')
+        workflow.connect(tumor_seg, 'out_file', apply_ts_tumor, 'input_image')
 
     # Connect datasink nodes to save outputs
     workflow.connect(tumor_seg, 'out_file', datasink,
@@ -330,12 +337,13 @@ def single_tp_tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                      'results.subid.@gtv_seg')
     workflow.connect(tumor_seg_2mods, 'output_file', datasink,
                      'results.subid.@tumor_seg_2mods')
-    workflow.connect(apply_ts_gtv, 'output_image', datasink,
-                     'results.subid.@gtv_reg2CT')
-    workflow.connect(apply_ts_tumor, 'output_image', datasink,
-                     'results.subid.@tumor_reg2CT')
-    workflow.connect(apply_ts_tumor1, 'output_image', datasink,
-                     'results.subid.@tumor1_reg2CT')
+    if reference:
+        workflow.connect(apply_ts_gtv, 'output_image', datasink,
+                         'results.subid.@gtv_reg2CT')
+        workflow.connect(apply_ts_tumor, 'output_image', datasink,
+                         'results.subid.@tumor_reg2CT')
+        workflow.connect(apply_ts_tumor1, 'output_image', datasink,
+                         'results.subid.@tumor1_reg2CT')
 
     workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
                              t10=False)

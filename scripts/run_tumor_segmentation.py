@@ -77,48 +77,52 @@ if __name__ == "__main__":
     
 
     for sub_id in sub_list:
-        print('Processing subject {}'.format(sub_id))
-        NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        if ARGS.run_registration:
-            if ARGS.run_bet:
-                datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
-                bet_workflow = brain_extraction(
-                    sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
-            else:
-                datasource, sessions = registration_datasource(
-                    sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
-                bet_workflow = None
-
-            reg_workflow = longitudinal_registration(
-                sub_id, datasource, sessions, reference, RESULT_DIR,
-                NIPYPE_CACHE, bet_workflow=bet_workflow)
+        if os.path.isdir(os.path.join(RESULT_DIR, 'results', sub_id)):
+            print('Skipping subjects {} as it has already been processed'
+                  .format(sub_id))
         else:
-            if ARGS.xnat_source:
-                
-                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
-                    url=ARGS.xnat_url, processed=True, subjects=[sub_id])
-            datasource, sessions, reference = segmentation_datasource(
-                sub_id, BASE_DIR)
-            reg_workflow = None
-            bet_workflow = None
-
-        seg_workflow = tumor_segmentation(
-            datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
-            ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reference,
-            reg_workflow=reg_workflow, bet_workflow=bet_workflow)
-
-        seg_workflow.run(plugin='Linear')
-        if ARGS.xnat_sink:
-            print('Uploading the results to XNAT with the following parameters:')
-            print('Server: {}'.format(ARGS.xnat_url))
-            print('Project ID: {}'.format(ARGS.xnat_pid))
-            print('User ID: {}'.format(ARGS.xnat_user))
-
-            xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
-                          ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
-
-            print('Uploading successfully completed!')
-        if CLEAN_CACHE:
-            shutil.rmtree(NIPYPE_CACHE)
+            print('Processing subject {}'.format(sub_id))
+            NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
+            if ARGS.run_registration:
+                if ARGS.run_bet:
+                    datasource, sessions, reference = gbm_datasource(sub_id, BASE_DIR)
+                    bet_workflow = brain_extraction(
+                        sub_id, datasource, sessions, RESULT_DIR, NIPYPE_CACHE, reference)
+                else:
+                    datasource, sessions = registration_datasource(
+                        sub_id, os.path.join(ARGS.work_dir, 'bet_results', 'results'))
+                    bet_workflow = None
+    
+                reg_workflow = longitudinal_registration(
+                    sub_id, datasource, sessions, reference, RESULT_DIR,
+                    NIPYPE_CACHE, bet_workflow=bet_workflow)
+            else:
+                if ARGS.xnat_source:
+                    
+                    get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                        url=ARGS.xnat_url, processed=True, subjects=[sub_id])
+                datasource, sessions, reference = segmentation_datasource(
+                    sub_id, BASE_DIR)
+                reg_workflow = None
+                bet_workflow = None
+    
+            seg_workflow = tumor_segmentation(
+                datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,
+                ARGS.tumor_seg_model_dir, RESULT_DIR, NIPYPE_CACHE, reference,
+                reg_workflow=reg_workflow, bet_workflow=bet_workflow)
+    
+            seg_workflow.run(plugin='Linear')
+            if ARGS.xnat_sink:
+                print('Uploading the results to XNAT with the following parameters:')
+                print('Server: {}'.format(ARGS.xnat_url))
+                print('Project ID: {}'.format(ARGS.xnat_pid))
+                print('User ID: {}'.format(ARGS.xnat_user))
+    
+                xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
+                              ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
+    
+                print('Uploading successfully completed!')
+            if CLEAN_CACHE:
+                shutil.rmtree(NIPYPE_CACHE)
 
     print('Done!')
