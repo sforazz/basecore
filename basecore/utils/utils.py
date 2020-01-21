@@ -4,11 +4,8 @@ import getpass
 
 class Password(argparse.Action):
     def __call__(self, parser, namespace, values, option_string):
+
         if values is None:
-            if self.dest:
-                print_arg = self.dest
-            else:
-                print_arg = 'Password:'
-            values = getpass.getpass(print_arg)
+            values = getpass.getpass('Please type in your password: ')
 
         setattr(namespace, self.dest, values)

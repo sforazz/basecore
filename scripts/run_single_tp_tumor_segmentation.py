@@ -49,7 +49,7 @@ if __name__ == "__main__":
                               'the results must be provided here.'))
     PARSER.add_argument('--xnat-user', '-xuser', type=str,
                         help=('If xnat-sink, the username on the server must be provided here.'))
-    PARSER.add_argument('--xnat-pwd', '-xpwd', action=Password, dest='Please type your XNAT password: ',
+    PARSER.add_argument('--xnat-pwd', '-xpwd', action=Password, dest='password',
                         nargs='?', type=str,
                         help=('If xnat-sink, the password on the server must be provided here.'))
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     elif ARGS.xnat_source and not ARGS.run_registration:
         BASE_DIR = os.path.join(BASE_DIR, 'xnat_cache')
         sub_list = get_subject_list(
-            ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+            ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.password,
             url=ARGS.xnat_url)
     elif ARGS.xnat_source and ARGS.run_registration:
         raise NotImplementedError('XNAT data source is currently supported only for tumor '
@@ -97,7 +97,7 @@ if __name__ == "__main__":
                 NIPYPE_CACHE, bet_workflow=bet_workflow)
         else:
             if ARGS.xnat_source:
-                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.password,
                     url=ARGS.xnat_url, processed=True, subjects=[sub_id])
             datasource, sessions, reference = single_tp_segmentation_datasource(
                 sub_id, BASE_DIR)
@@ -117,7 +117,7 @@ if __name__ == "__main__":
             print('User ID: {}'.format(ARGS.xnat_user))
 
             xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
-                          ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
+                          ARGS.xnat_user, ARGS.password, url=ARGS.xnat_url, processed=True)
 
             print('Uploading successfully completed!')
         if CLEAN_CACHE:
