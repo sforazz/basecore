@@ -301,7 +301,8 @@ class NNUnetInferenceOutputSpec(TraitedSpec):
 
 class NNUnetInference(CommandLine):
 
-    _cmd = os.path.join(BASH_PATH, 'predict_simple.py')
+#     _cmd = os.path.join(BASH_PATH, 'predict_simple.py')
+    _cmd = 'predict_simple.py'
     input_spec = NNUnetInferenceInputSpec
     output_spec = NNUnetInferenceOutputSpec
 

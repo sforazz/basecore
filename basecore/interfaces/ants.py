@@ -62,7 +62,8 @@ class AntsRegSynOutputSpec(TraitedSpec):
 
 class AntsRegSyn(CommandLine):
 
-    _cmd = os.path.join(BASH_PATH, 'antsRegistrationSyN.sh')
+#     _cmd = os.path.join(BASH_PATH, 'antsRegistrationSyN.sh')
+    _cmd = 'antsRegistrationSyN1.sh'
     input_spec = AntsRegSynInputSpec
     output_spec = AntsRegSynOutputSpec
 
