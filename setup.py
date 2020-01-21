@@ -33,5 +33,6 @@ setup(name='basecore',
           'Programming Language :: Python',
           'Topic :: Scientific/Engineering',
           'Operating System :: Unix'
-      ]
+      ],
+      scripts=['bash/predict_simple.py', 'bash/antsRegistrationSyN.sh']
       )
