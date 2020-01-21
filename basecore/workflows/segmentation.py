@@ -235,7 +235,9 @@ def single_tp_tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                                      iterfield=['input_image', 'transforms'],
                                      name='apply_ts_tumor1')
         apply_ts_tumor1.inputs.interpolation = 'NearestNeighbor'
-        outname = 'reg2CT'
+        outname = '_reg2CT'
+    else:
+        outname = ''
 
     tumor_seg  = nipype.MapNode(interface=HDGlioPredict(),
                                 iterfield=['t1', 'ct1', 't2', 'flair'],
@@ -268,11 +270,11 @@ def single_tp_tumor_segmentation(datasource, sub_id, sessions, gtv_model,
         substitutions += [('_tumor_seg_2mods{}/subject1'.format(i),
                            session+'/Tumor_predicted_2modalities')]
         substitutions += [('_apply_ts_gtv{}/subject1_trans.nii.gz'.format(i),
-                           session+'/'+'GTV_predicted_{}.nii.gz'.format(outname))]
+                           session+'/'+'GTV_predicted{}.nii.gz'.format(outname))]
         substitutions += [('_apply_ts_tumor1{}/subject1_trans.nii.gz'.format(i),
-                           session+'/'+'Tumor_predicted_2modalities_{}.nii.gz'.format(outname))]
+                           session+'/'+'Tumor_predicted_2modalities{}.nii.gz'.format(outname))]
         substitutions += [('_apply_ts_tumor{}/segmentation_trans.nii.gz'.format(i),
-                           session+'/'+'Tumor_predicted_{}.nii.gz'.format(outname))]
+                           session+'/'+'Tumor_predicted{}.nii.gz'.format(outname))]
 
     datasink.inputs.substitutions =substitutions
 
