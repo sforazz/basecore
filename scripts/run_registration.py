@@ -65,9 +65,10 @@ if __name__ == "__main__":
     sub_list = os.listdir(BASE_DIR)
 
     print('Number of subjects: {}'.format(len(sub_list)))
-    processed = os.listdir(RESULT_DIR+'/results')
-    sub_list = [x for x in sub_list if x not in processed]
-    print('Number of subjects without processed: {}'.format(len(sub_list)))
+    if os.path.isdir(RESULT_DIR):
+        processed = os.listdir(RESULT_DIR+'/results')
+        sub_list = [x for x in sub_list if x not in processed]
+        print('Number of subjects without processed: {}'.format(len(sub_list)))
 
     for sub_id in sub_list:
         ready = False

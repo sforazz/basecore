@@ -3,6 +3,7 @@ import nipype
 from nipype.interfaces.fsl.maths import ApplyMask
 from nipype.interfaces.ants import ApplyTransforms
 from nipype.interfaces.utility import Merge, Split
+from nipype.interfaces.fsl.utils import Reorient2Std
 from basecore.interfaces.ants import AntsRegSyn
 from basecore.workflows.datahandler import SEQUENCES, datasink_base
 
@@ -46,6 +47,14 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         masking = nipype.MapNode(interface=ApplyMask(), iterfield=['in_file', 'mask_file'],
                                  name='masking{}'.format(i))
         apply_mask_nodes.append(masking)
+    
+    reorient_nodes = []
+    for i in range(4):
+        reorient = nipype.MapNode(interface=Reorient2Std(), iterfield=['in_file'],
+                                 name='reorient{}'.format(i))
+        reorient_nodes.append(reorient)
+    
+    reorient_t10 = nipype.Node(interface=Reorient2Std(), name='reorient_t10')
 
     apply_ts_nodes = []
     for i in range(3):
@@ -142,23 +151,34 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     # Create Workflow
     workflow = nipype.Workflow('registration_workflow', base_dir=nipype_cache)
 
+    workflow.connect(datasource, 't1_0', reorient_t10, 'in_file')
+
+    for i, node in enumerate(reorient_nodes):
+        workflow.connect(datasource, SEQUENCES[i], node, 'in_file')
+
     for i, reg in enumerate(reg_nodes):
-        workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
-        workflow.connect(datasource, SEQUENCES[0], reg, 'ref_file')
+        workflow.connect(reorient_nodes[i+1], 'out_file', reg, 'input_file')
+        workflow.connect(reorient_nodes[0], 'out_file', reg, 'ref_file')
+#         workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
+#         workflow.connect(datasource, SEQUENCES[0], reg, 'ref_file')
     # bring every MR in CT space
     for i, node in enumerate(apply_ts_nodes):
-        workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
+        workflow.connect(reorient_nodes[i+1], 'out_file', node, 'input_image')
+#         workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
         if reference:
             workflow.connect(datasource, 'reference', node, 'reference_image')
         else:
-            workflow.connect(datasource, 't1_0', node, 'reference_image')
+            workflow.connect(reorient_t10, 'out_file', node, 'reference_image')
+#             workflow.connect(datasource, 't1_0', node, 'reference_image')
         workflow.connect(merge_nodes[i], 'out', node, 'transforms')
         workflow.connect(node, 'output_image', datasink,
                          'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
     # bring every MR in T1_ref space
     for i, node in enumerate(apply_ts_nodes1):
-        workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
-        workflow.connect(datasource, 't1_0', node, 'reference_image')
+        workflow.connect(reorient_nodes[i+1], 'out_file', node, 'input_image')
+#         workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
+#         workflow.connect(datasource, 't1_0', node, 'reference_image')
+        workflow.connect(reorient_t10, 'out_file', node, 'reference_image')
         workflow.connect(merge_nodes1[i], 'out', node, 'transforms')
         workflow.connect(node, 'output_image', datasink,
                          'results.subid.@{}_reg2T1_ref'.format(SEQUENCES[i+1])) 
@@ -196,15 +216,20 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
             workflow.connect(regT12CT, 'regmat', datasink,
                              'results.subid.{0}.@regT12CT_mat'.format(sess))
         workflow.connect(datasource, 'reference', regT12CT, 'ref_file')
-        workflow.connect(datasource, 't1_0', regT12CT, 'input_file')
+        workflow.connect(reorient_t10, 'out_file', regT12CT,
+                         'input_file') 
+#         workflow.connect(datasource, 't1_0', regT12CT, 'input_file')
         workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
         workflow.connect(datasource, 'reference', apply_ts_t1,
                          'reference_image')
     else:
-        workflow.connect(datasource, 't1_0', apply_ts_t1,
+        workflow.connect(reorient_t10, 'out_file', apply_ts_t1,
                          'reference_image') 
+#         workflow.connect(datasource, 't1_0', apply_ts_t1,
+#                          'reference_image') 
 
-    workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
+#     workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
+    workflow.connect(reorient_nodes[0], 'out_file', apply_ts_t1, 'input_image')
 
     workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0+1))

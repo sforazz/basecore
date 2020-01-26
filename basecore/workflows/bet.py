@@ -19,7 +19,7 @@ def brain_extraction(sub_id, datasource, sessions,
         bet_t10 = nipype.Node(interface=HDBet(), name='t1_0_bet')
         bet_t10.inputs.save_mask = 1
         bet_t10.inputs.out_file = 'T1_0_bet'
-        reorient_t10 = nipype.MapNode(interface=Reorient2Std(), iterfield=['in_file'],
+        reorient_t10 = nipype.Node(interface=Reorient2Std(), iterfield=['in_file'],
                               name='reorient_t10')
 
     datasink = nipype.Node(nipype.DataSink(base_directory=RESULT_DIR), "datasink")
