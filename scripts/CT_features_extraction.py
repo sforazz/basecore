@@ -4,7 +4,7 @@ import nipype
 from basecore.interfaces.mitk import Voxelizer, CLGlobalFeatures
 from nipype.interfaces.utility import Select
 
-
+tgggggg
 def creste_sub_list(basedir):
 
     processed_subs = []
