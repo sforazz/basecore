@@ -152,6 +152,12 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
                            session+'/'+'T2_reg2T1_ref.nii.gz')]
         substitutions += [('_apply_ts12{}/FLAIR_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'FLAIR_reg2T1_ref.nii.gz')]
+        substitutions += [('_masking_t1ref0{}/CT1_reoriented_trans_masked.nii.gz'.format(i),
+                           session+'/'+'CT1_reg2T1_ref_masked.nii.gz')]
+        substitutions += [('_masking_t1ref1{}/T2_reoriented_trans_masked.nii.gz'.format(i),
+                           session+'/'+'T2_reg2T1_ref_masked.nii.gz')]
+        substitutions += [('_masking_t1ref2{}/FLAIR_reoriented_trans_masked.nii.gz'.format(i),
+                           session+'/'+'FLAIR_reg2T1_ref_masked.nii.gz')]
 
     datasink.inputs.substitutions =substitutions
     # Create Workflow
@@ -235,16 +241,14 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         workflow.connect(fake_merge, 'out', merge_ts_t1, 'in1')
         workflow.connect(datasource, 'reference', apply_ts_t1,
                          'reference_image')
-    else:
-        workflow.connect(reorient_t10, 'out_file', apply_ts_t1,
-                         'reference_image') 
 #         workflow.connect(datasource, 't1_0', apply_ts_t1,
 #                          'reference_image') 
-
 #     workflow.connect(datasource, 't1', apply_ts_t1, 'input_image')
-    workflow.connect(reorient_nodes[0], 'out_file', apply_ts_t1, 'input_image')
-
-    workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
+        workflow.connect(reorient_nodes[0], 'out_file', apply_ts_t1, 'input_image')
+    
+        workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
+        workflow.connect(apply_ts_t1, 'output_image', datasink,
+                         'results.subid.@T1_reg2CT')
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0+1))
     workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0))
 
@@ -254,8 +258,6 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
                      'results.subid.@reg2CT_mat')
     workflow.connect(reg2T1, 'reg_file', datasink,
                      'results.subid.@T12T1_ref')
-    workflow.connect(apply_ts_t1, 'output_image', datasink,
-                     'results.subid.@T1_reg2CT')
 
     if bet_workflow is not None:
         workflow = datasink_base(datasink, datasource, workflow, sessions, reference)
