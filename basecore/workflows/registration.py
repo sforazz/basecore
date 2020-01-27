@@ -47,6 +47,12 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         masking = nipype.MapNode(interface=ApplyMask(), iterfield=['in_file', 'mask_file'],
                                  name='masking{}'.format(i))
         apply_mask_nodes.append(masking)
+
+    apply_mask_t1ref_nodes = []
+    for i in range(3):
+        masking = nipype.MapNode(interface=ApplyMask(), iterfield=['in_file', 'mask_file'],
+                                 name='masking_t1ref{}'.format(i))
+        apply_mask_t1ref_nodes.append(masking)
     
     reorient_nodes = []
     for i in range(4):
@@ -132,19 +138,19 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
                            session+'/'+'T2_preproc.nii.gz')]
         substitutions += [('_masking2{}/antsregWarped_masked.nii.gz'.format(i),
                            session+'/'+'FLAIR_preproc.nii.gz')]
-        substitutions += [('_apply_ts0{}/CT1_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts0{}/CT1_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'CT1_reg2CT.nii.gz')]
-        substitutions += [('_apply_ts1{}/T2_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts1{}/T2_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'T2_reg2CT.nii.gz')]
-        substitutions += [('_apply_ts2{}/FLAIR_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts2{}/FLAIR_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'FLAIR_reg2CT.nii.gz')]
-        substitutions += [('_apply_ts_t1{}/T1_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts_t1{}/T1_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'T1_reg2CT.nii.gz')]
-        substitutions += [('_apply_ts10{}/CT1_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts10{}/CT1_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'CT1_reg2T1_ref.nii.gz')]
-        substitutions += [('_apply_ts11{}/T2_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts11{}/T2_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'T2_reg2T1_ref.nii.gz')]
-        substitutions += [('_apply_ts12{}/FLAIR_trans.nii.gz'.format(i),
+        substitutions += [('_apply_ts12{}/FLAIR_reoriented_trans.nii.gz'.format(i),
                            session+'/'+'FLAIR_reg2T1_ref.nii.gz')]
 
     datasink.inputs.substitutions =substitutions
@@ -162,17 +168,14 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
 #         workflow.connect(datasource, SEQUENCES[i+1], reg, 'input_file')
 #         workflow.connect(datasource, SEQUENCES[0], reg, 'ref_file')
     # bring every MR in CT space
-    for i, node in enumerate(apply_ts_nodes):
-        workflow.connect(reorient_nodes[i+1], 'out_file', node, 'input_image')
-#         workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
-        if reference:
+    if reference:
+        for i, node in enumerate(apply_ts_nodes):
+            workflow.connect(reorient_nodes[i+1], 'out_file', node, 'input_image')
+    #         workflow.connect(datasource, SEQUENCES[i+1], node, 'input_image')
             workflow.connect(datasource, 'reference', node, 'reference_image')
-        else:
-            workflow.connect(reorient_t10, 'out_file', node, 'reference_image')
-#             workflow.connect(datasource, 't1_0', node, 'reference_image')
-        workflow.connect(merge_nodes[i], 'out', node, 'transforms')
-        workflow.connect(node, 'output_image', datasink,
-                         'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
+            workflow.connect(merge_nodes[i], 'out', node, 'transforms')
+            workflow.connect(node, 'output_image', datasink,
+                             'results.subid.@{}_reg2CT'.format(SEQUENCES[i+1]))
     # bring every MR in T1_ref space
     for i, node in enumerate(apply_ts_nodes1):
         workflow.connect(reorient_nodes[i+1], 'out_file', node, 'input_image')
@@ -203,6 +206,16 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
             workflow.connect(datasource, 't1_mask', mask, 'mask_file')
         workflow.connect(mask, 'out_file', datasink,
                          'results.subid.@{}_preproc'.format(SEQUENCES[i+1]))
+    
+    for i, mask in enumerate(apply_mask_t1ref_nodes):
+        workflow.connect(apply_ts_nodes1[i], 'output_image', mask, 'in_file')
+        if bet_workflow is not None:
+            workflow.connect(bet_workflow, 'bet.t1_0_bet', mask, 'mask_file')
+        else:
+            workflow.connect(datasource, 't1_0_mask', mask, 'mask_file')
+        workflow.connect(mask, 'out_file', datasink,
+                         'results.subid.@{}_reg2T1_ref_masked'.format(SEQUENCES[i+1]))
+
     if bet_workflow is not None:
         workflow.connect(bet_workflow, 'bet.out_file', reg2T1, 'input_file')
         workflow.connect(bet_workflow, 't1_0_bet.out_file', reg2T1, 'ref_file')

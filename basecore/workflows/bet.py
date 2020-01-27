@@ -40,6 +40,8 @@ def brain_extraction(sub_id, datasource, sessions,
         workflow.connect(reorient_t10, 'out_file', bet_t10, 'input_file')
         workflow.connect(bet_t10, 'out_file', datasink,
                          'results.subid.T10.@T1_ref_bet')
+        workflow.connect(bet_t10, 'out_mask', datasink,
+                         'results.subid.T10.@T1_ref_bet_mask')
 
     workflow.connect(bet, 'out_file', datasink,
                      'results.subid.@T1_preproc')

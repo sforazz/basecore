@@ -37,6 +37,9 @@ if __name__ == "__main__":
     PARSER.add_argument('--xnat-sink', '-xs', action='store_true',
                         help=('Whether or not to upload the processed files to XNAT. '
                               'Default is False'))
+    PARSER.add_argument('--overwrite', '-ow', action='store_true',
+                        help=('Whether or not to delete existing session on XNAT. '
+                              'Default is False'))
     PARSER.add_argument('--xnat-url', '-xurl', type=str, default='https://central.xnat.org',
                         help=('If xnat-sink, the url of the server must be provided here. '
                               'Default is https://central.xnat.org'))#
@@ -95,15 +98,15 @@ if __name__ == "__main__":
                   .format(CORES))
             workflow.run('MultiProc', plugin_args={'n_procs': CORES})
 
-        while not ready:
-            if not os.path.isdir('/nfs/extra_hd/result2upload/ready'):
-                shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
-                                '/nfs/extra_hd/result2upload/{}'.format(sub_id))
-                os.mkdir('/nfs/extra_hd/result2upload/ready')
-                ready = True
-            else:
-                print('Old results are still in the folder, wait 1 minute...')
-                time.sleep(60)
+#         while not ready:
+#             if not os.path.isdir('/nfs/extra_hd/result2upload/ready'):
+#                 shutil.copytree(os.path.join(RESULT_DIR, 'results', sub_id),
+#                                 '/nfs/extra_hd/result2upload/{}'.format(sub_id))
+#                 os.mkdir('/nfs/extra_hd/result2upload/ready')
+#                 ready = True
+#             else:
+#                 print('Old results are still in the folder, wait 1 minute...')
+#                 time.sleep(60)
         if ARGS.xnat_sink:
             print('Uploading the results to XNAT with the following parameters:')
             print('Server: {}'.format(ARGS.xnat_url))
@@ -111,7 +114,8 @@ if __name__ == "__main__":
             print('User ID: {}'.format(ARGS.xnat_user))
 
             xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
-                          ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
+                          ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True,
+                          overwrite=ARGS.overwrite)
 
             print('Uploading successfully completed!')
         if CLEAN_CACHE:

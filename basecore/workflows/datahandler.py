@@ -98,7 +98,7 @@ def registration_datasource(sub_id, BASE_DIR):
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
             outfields=['t1', 'ct1', 't2', 'flair', 'reference', 't1_0',
-                       't1_0_bet', 't1_bet', 't1_mask']),
+                       't1_0_bet', 't1_bet', 't1_mask', 't1_0_mask']),
             name='datasource')
     datasource.inputs.base_directory = BASE_DIR
     datasource.inputs.template = '*'
@@ -109,6 +109,7 @@ def registration_datasource(sub_id, BASE_DIR):
                                             reference='%s/%s/CT.nii.gz',
                                             t1_0='%s/%s/T1.nii.gz',
                                             t1_0_bet='%s/%s/T1_0_bet.nii.gz',
+                                            t1_0_mask='%s/%s/T1_0_bet_mask.nii.gz',
                                             t1_bet='%s/%s/T1_preproc.nii.gz',
                                             t1_mask='%s/%s/T1_preproc_mask.nii.gz')
     datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
@@ -118,6 +119,7 @@ def registration_datasource(sub_id, BASE_DIR):
                                            reference=[['sub_id', 'ref_ct']],
                                            t1_0=[['sub_id', 'ref_t1']],
                                            t1_0_bet=[['sub_id', 'ref_t1']],
+                                           t1_0_mask=[['sub_id', 'ref_t1']],
                                            t1_bet=[['sub_id', 'sessions']],
                                            t1_mask=[['sub_id', 'sessions']])
     datasource.inputs.sub_id = sub_id
@@ -310,10 +312,11 @@ def datasink_base(datasink, datasource, workflow, sessions, reference,
 
 
 def xnat_datasink(project_id, sub_id, result_dir, user, pwd,
-                  url='https://central.xnat.org', processed=True):
+                  url='https://central.xnat.org', processed=True,
+                  overwrite=False):
     
     sub_folder = os.path.join(result_dir, sub_id)
     sessions = [x for x in sorted(os.listdir(sub_folder))
                 if os.path.isdir(os.path.join(sub_folder, x))]
     put(project_id, sub_id, sessions, sub_folder, url=url,
-        pwd=pwd, user=user, processed=processed)
+        pwd=pwd, user=user, processed=processed, overwrite=overwrite)

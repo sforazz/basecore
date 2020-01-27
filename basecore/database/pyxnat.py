@@ -11,7 +11,7 @@ session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
 
 
 def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None, user=None,
-        processed=False):
+        processed=False, overwrite=False):
 
     if config is not None:
         interface = Interface(config)
@@ -49,6 +49,9 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
             scan_type = 'xnat:rtScanData'
         
         experiment = sub_id.experiment('%s_%s%s'%(xnat_sub.label(), session, proc))
+        if experiment.exists() and overwrite:
+            print('Deleting old experiment folder')
+            experiment.delete()
         if not experiment.exists():
             try:
                 experiment.create(experiments=experiment_type)
