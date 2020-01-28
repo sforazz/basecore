@@ -118,6 +118,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     # have to create a fake merge of the transformation from t10 to CT in order
     # to have the same number if matrices as input in mapnode
     fake_merge = nipype.Node(interface=Merge(len(sessions)), name='fake_merge')
+    fake_merge_t1 = nipype.Node(interface=Merge(len(sessions)), name='fake_merge_t1')
 
     datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
 
@@ -220,7 +221,8 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         if bet_workflow is not None:
             workflow.connect(bet_workflow, 'bet.t1_0_bet', mask, 'mask_file')
         else:
-            workflow.connect(datasource, 't1_0_mask', mask, 'mask_file')
+            workflow.connect(fake_merge_t1, 'out', mask, 'mask_file')
+#             workflow.connect(datasource, 't1_0_mask', mask, 'mask_file')
         workflow.connect(mask, 'out_file', datasink,
                          'results.subid.@{}_reg2T1_ref_masked'.format(SEQUENCES[i+1]))
 
@@ -251,6 +253,8 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         workflow.connect(merge_ts_t1, 'out', apply_ts_t1, 'transforms')
         workflow.connect(apply_ts_t1, 'output_image', datasink,
                          'results.subid.@T1_reg2CT')
+    for i, sess in enumerate(sessions):
+        workflow.connect(datasource, 't1_0_mask', fake_merge_t1, 'in{}'.format(i+1))
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0+1))
     workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0))
 
