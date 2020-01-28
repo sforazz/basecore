@@ -130,6 +130,8 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
                            session+'/'+'reg2T1_ref.mat')]
         substitutions += [('_reg2T1{}/antsreg1Warp.nii.gz'.format(i),
                            session+'/'+'reg2T1_ref_warp.nii.gz')]
+        substitutions += [('_reg2T1{}/antsreg1InverseWarp.nii.gz'.format(i),
+                           session+'/'+'reg2T1_ref_inverse_warp.nii.gz')]
         substitutions += [('_reg2T1{}/antsregWarped.nii.gz'.format(i),
                            session+'/'+'T1_reg2T1_ref.nii.gz')]
         substitutions += [('_regT12CT{}/antsreg0GenericAffine.mat'.format(i),
@@ -254,6 +256,8 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
 
     workflow.connect(reg2T1, 'warp_file', datasink,
                      'results.subid.@reg2CT_warp')
+    workflow.connect(reg2T1, 'inv_warp', datasink,
+                     'results.subid.@reg2CT_inverse_warp')
     workflow.connect(reg2T1, 'regmat', datasink,
                      'results.subid.@reg2CT_mat')
     workflow.connect(reg2T1, 'reg_file', datasink,
