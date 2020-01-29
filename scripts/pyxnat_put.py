@@ -24,6 +24,9 @@ if __name__ == "__main__":
     PARSER.add_argument('--processed', '-p', action='store_true',
                         help=('Whether or not the folder to upload should go to a processed'
                               ' session. Default is False.'))
+    PARSER.add_argument('--overwrite', '-ow', action='store_true',
+                        help=('Whether or not to delete existing session on XNAT. '
+                              'Default is False'))
 
     ARGS = PARSER.parse_args()
     print('Uploading the results to XNAT with the following parameters:')
