@@ -32,4 +32,4 @@ if __name__ == "__main__":
     print('User ID: {}'.format(ARGS.xnat_user))
     
     put(ARGS.xnat_pid, ARGS.sub_id, ARGS.session_ids, ARGS.input_folder, url=ARGS.xnat_url,
-        pwd=ARGS.xnat_pwd, user=ARGS.xnat_user, processed=ARGS.processed)
+        pwd=ARGS.xnat_pwd, user=ARGS.xnat_user, processed=ARGS.processed, overwrite=ARGS.overwrite)
