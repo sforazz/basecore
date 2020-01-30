@@ -254,7 +254,11 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
         workflow.connect(apply_ts_t1, 'output_image', datasink,
                          'results.subid.@T1_reg2CT')
     for i, sess in enumerate(sessions):
-        workflow.connect(datasource, 't1_0_mask', fake_merge_t1, 'in{}'.format(i+1))
+        if bet_workflow is not None:
+            workflow.connect(bet_workflow, 't1_0_bet.out_mask',
+                             fake_merge_t1, 'in{}'.format(i+1))
+        else:
+            workflow.connect(datasource, 't1_0_mask', fake_merge_t1, 'in{}'.format(i+1))
     workflow.connect(reg2T1, 'regmat', merge_ts_t1, 'in{}'.format(if_0+1))
     workflow.connect(reg2T1, 'warp_file', merge_ts_t1, 'in{}'.format(if_0))
 
