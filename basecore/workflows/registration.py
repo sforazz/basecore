@@ -219,7 +219,7 @@ def longitudinal_registration(sub_id, datasource, sessions, reference,
     for i, mask in enumerate(apply_mask_t1ref_nodes):
         workflow.connect(apply_ts_nodes1[i], 'output_image', mask, 'in_file')
         if bet_workflow is not None:
-            workflow.connect(bet_workflow, 'bet.t1_0_bet', mask, 'mask_file')
+            workflow.connect(bet_workflow, 't1_0_bet.out_mask', mask, 'mask_file')
         else:
             workflow.connect(fake_merge_t1, 'out', mask, 'mask_file')
 #             workflow.connect(datasource, 't1_0_mask', mask, 'mask_file')
