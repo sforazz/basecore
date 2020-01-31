@@ -1,5 +1,5 @@
 from nipype.interfaces.base import (
-    BaseInterface, CommandLineInputSpec, TraitedSpec, Directory, File,
+    BaseInterface, TraitedSpec, Directory, File,
     traits, BaseInterfaceInputSpec, InputMultiPath)
 import pydicom
 import numpy as np
@@ -11,6 +11,9 @@ import os
 import nibabel as nib
 import glob
 from basecore.utils.filemanip import split_filename
+from skimage.transform import resize
+import pydicom as pd
+import re
 
 
 RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
@@ -30,6 +33,8 @@ class DicomCheckOutputSpec(TraitedSpec):
     outdir = Directory(exists=True, desc='Path to the directory with the corrected DICOM files')
     scan_name = traits.Str(desc='Scan name')
     base_dir = Directory(exists=True, desc='Root path of outdir')
+    dose_file = File(desc='Dose file, if any')
+    dose_output = File()
 
 
 class DicomCheck(BaseInterface):
@@ -41,6 +46,7 @@ class DicomCheck(BaseInterface):
 
         dicom_dir = self.inputs.dicom_dir
         wd = self.inputs.working_dir
+        self.dose_file = None
 
         img_paths = dicom_dir.split('/')
         scan_name = list(set(POSSIBLE_NAMES).intersection(img_paths))[0]
@@ -63,6 +69,15 @@ class DicomCheck(BaseInterface):
                     shutil.copytree(curr_item, os.path.join(wd, sub_name, tp, scan_name, item))
                 else:
                     shutil.copy2(curr_item, os.path.join(wd, sub_name, tp, scan_name))
+                if scan_name == 'RTSTRUCT' and '1-' in item:
+                    rt_folder = os.path.join(wd, sub_name, tp, scan_name, item)
+                    rt_dcm = glob.glob(rt_folder+'/*.dcm')[0]
+                    ds = pd.read_file(rt_dcm)
+                    regex = re.compile('[^a-zA-Z]')
+                    for i in range(len(ds.StructureSetROISequence)):
+                        new_roiname=regex.sub('', ds.StructureSetROISequence[i].ROIName)
+                        ds.StructureSetROISequence[i].ROIName = new_roiname
+                    ds.save_as(rt_dcm)
         else:
             dicoms, im_types, series_nums = self.dcm_info()
             dicoms = self.dcm_check(dicoms, im_types, series_nums)
@@ -77,6 +92,10 @@ class DicomCheck(BaseInterface):
         self.outdir = os.path.join(wd, sub_name, tp, scan_name)
         self.scan_name = scan_name
         self.base_dir = os.path.join(wd, sub_name, tp)
+        if scan_name == 'RTDOSE':
+            self.dose_file = glob.glob(os.path.join('/'.join(img_paths), '*.dcm'))[0]
+            self.dose_output = os.path.join(wd, sub_name, tp, 'RTDOSE.nii.gz')
+
         return runtime
 
     def _list_outputs(self):
@@ -84,6 +103,12 @@ class DicomCheck(BaseInterface):
         outputs['outdir'] = self.outdir
         outputs['scan_name'] = self.scan_name
         outputs['base_dir'] = self.base_dir
+        if self.dose_file is not None:
+            outputs['dose_file'] = self.dose_file
+            outputs['dose_output'] = self.dose_output
+        else:
+            outputs['dose_file'] = self.scan_name
+            outputs['dose_output'] = self.scan_name
 
         return outputs
 
@@ -333,5 +358,56 @@ class NNUnetPreparation(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs['output_folder'] = os.path.abspath('data_prepared')
+
+        return outputs
+
+
+class CheckRTStructuresInputSpec(BaseInterfaceInputSpec):
+    
+    rois = InputMultiPath(File(exists=True), desc='RT structures to check')
+    dose_file = File(exists=True, desc='Dose file.')
+
+
+class CheckRTStructuresOutputSpec(TraitedSpec):
+    
+    checked_roi = File(exists=True, desc='ROI with the maximum overlap with the dose file.')
+
+
+class CheckRTStructures(BaseInterface):
+    
+    input_spec = CheckRTStructuresInputSpec
+    output_spec = CheckRTStructuresOutputSpec
+
+    def _run_interface(self, runtime):
+    
+        rois = self.inputs.rois
+        dose_nii = self.inputs.dose_file
+        if len(rois) > 1:
+            roi_dict = {}
+            dose = nib.load(dose_nii).get_data()
+            dose_vector = dose[dose > 0]
+            dose_maxvalue = np.percentile(dose_vector, 99)
+            ref_roi = nib.load(rois[0]).get_data()
+            if dose.shape != ref_roi.shape:
+                dose = resize(dose, ref_roi.shape, order=0, mode='edge',
+                                   cval=0, anti_aliasing=False)
+
+            dose_bool = dose >= dose_maxvalue
+            
+            for f in rois:
+                roi = nib.load(f).get_data()
+                roi_bool = roi > 0
+                nr_andvoxel = np.logical_and(dose_bool, roi_bool)
+                roi_dict[f] = np.sum(nr_andvoxel)/np.sum(roi_bool)
+            roi_tokeep = max(roi_dict, key=lambda key: roi_dict[key])
+            for key in roi_dict.keys():
+                if key == roi_tokeep:
+                    self.checked_roi = key
+
+        return runtime
+    
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['checked_roi'] = self.checked_roi
 
         return outputs
