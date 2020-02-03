@@ -14,13 +14,21 @@ from basecore.utils.filemanip import split_filename
 from skimage.transform import resize
 import pydicom as pd
 import re
+import subprocess as sp
 
 
 RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
 POSSIBLE_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'T1KM', 'FLAIR',
                   'CT', 'ADC', 'T1', 'SWI', 'T2', 'T2KM', 'CT1',
                   'RTCT']
-
+ExplicitVRLittleEndian = '1.2.840.10008.1.2.1'
+ImplicitVRLittleEndian = '1.2.840.10008.1.2'
+DeflatedExplicitVRLittleEndian = '1.2.840.10008.1.2.1.99'
+ExplicitVRBigEndian = '1.2.840.10008.1.2.2'
+NotCompressedPixelTransferSyntaxes = [ExplicitVRLittleEndian,
+                                      ImplicitVRLittleEndian,
+                                      DeflatedExplicitVRLittleEndian,
+                                      ExplicitVRBigEndian]
 
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
 
@@ -141,6 +149,10 @@ class DicomCheck(BaseInterface):
         toRemove = []
         InstanceNums = []
         for dcm in dicoms:
+            #Check whether the dicom is compressed, if yes decompress
+            if (pd.read_file(str(dcm)).file_meta.TransferSyntaxUID
+                    not in NotCompressedPixelTransferSyntaxes):
+                self.decompress_dicom(dcm)
             try:
                 header = pydicom.read_file(str(dcm))
                 ImageTypes.append(tuple(header.ImageType))
@@ -196,6 +208,11 @@ class DicomCheck(BaseInterface):
             dcms = dicoms
 
         return [str(x) for x in dcms]
+    
+    def decompress_dicom(self, dicom):
+    
+        cmd = ("gdcmconv --raw {0} {1} ".format(dicom, dicom))
+        sp.check_output(cmd, shell=True) 
 
 
 class ConversionCheckInputSpec(BaseInterfaceInputSpec):
