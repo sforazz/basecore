@@ -4,48 +4,88 @@ from nipype.interfaces.utility import Split
 from basecore.database.pyxnat import put
 
 
-SEQUENCES = ['t1', 'ct1', 't2', 'flair']
+SEQUENCES = []
+REF_SEQUENCE = 't1'
+POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair']
 
 
-def gbm_datasource(sub_id, BASE_DIR):
+def define_datasource_inputs(sequences, ref, t10=True):
 
+    field_template = dict(reference='%s/%s/CT.nii.gz',
+                          t1_0='%s/%s/T1.nii.gz')
+    template_args = dict(reference=[['sub_id', 'ref_ct']],
+                         t1_0=[['sub_id', 'ref_t1']])
+    for seq in ref+sequences:
+        field_template[seq] = '%s/%s/{}.nii.gz'.format(seq.upper())
+        template_args[seq] = [['sub_id', 'sessions']]
+    
+    outfields = ref+sequences+['reference']
+    if t10:
+        outfields.append('t1_0')
+
+    return field_template, template_args, outfields
+
+    
+def base_datasource(sub_id, BASE_DIR, sequences=None, ref_sequence=None):
+        
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
     ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                    if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+    t10_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
+                   if x == 'T10' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
+
+    if sequences is None or ref_sequence is None:
+        sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
+                              for y in os.listdir(os.path.join(BASE_DIR, sub_id, x))
+                              if y.endswith('.nii.gz')]))
+        sequences = [x for x in sequences if x in POSSIBLE_SEQUENCES]
+        if 't1' in sequences:
+            ref_sequence = 't1'
+        elif 'ct1' in sequences:
+            ref_sequence = 'ct1'
+        else:
+            raise Exception('Nor T1 neither T1KM were found in {}. You need at least one of them '
+                            'in order to perform registration.'.format(sub_id))
+        sequences.remove(ref_sequence)
+    
+    field_template, template_args, outfields = define_datasource_inputs(
+        sequences, [ref_sequence])
+    
     if ref_session:
         reference = True
     else:
         print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         reference = False
+
+    if t10_session:
+        t10 = True
+    else:
+        t10 = False
+
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
-            outfields=['t1', 'ct1', 't2', 'flair', 'reference', 't1_0']),
+            outfields=outfields),
             name='datasource')
     datasource.inputs.base_directory = BASE_DIR
     datasource.inputs.template = '*'
     datasource.inputs.sort_filelist = True
     datasource.inputs.raise_on_empty = False
-    datasource.inputs.field_template = dict(t1='%s/%s/T1.nii.gz', ct1='%s/%s/CT1.nii.gz',
-                                            t2='%s/%s/T2.nii.gz', flair='%s/%s/FLAIR.nii.gz',
-                                            reference='%s/%s/CT.nii.gz',
-                                            t1_0='%s/%s/T1.nii.gz')
-    datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
-                                           ct1=[['sub_id', 'sessions']],
-                                           t2=[['sub_id', 'sessions']],
-                                           flair=[['sub_id', 'sessions']],
-                                           reference=[['sub_id', 'ref_ct']],
-                                           t1_0=[['sub_id', 'ref_t1']])
+    datasource.inputs.field_template = field_template
+    datasource.inputs.template_args = template_args
     datasource.inputs.sub_id = sub_id
     datasource.inputs.sessions = sessions
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
     
-    return datasource, sessions, reference
+    return datasource, sessions, reference, t10, sequences, ref_sequence
 
 
 def cinderella_tp0_datasource(sub_id, BASE_DIR):
+
+    field_template, template_args, outfields = define_datasource_inputs(
+        SEQUENCES, [REF_SEQUENCE], t10=False)
 
     sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
                 if 'REF' not in x and 'RT_' not in x]
@@ -60,20 +100,14 @@ def cinderella_tp0_datasource(sub_id, BASE_DIR):
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
             infields=['sub_id', 'sessions', 'ref_ct'],
-            outfields=['t1', 'ct1', 't2', 'flair', 'reference']),
+            outfields=outfields),
             name='datasource')
     datasource.inputs.base_directory = BASE_DIR
     datasource.inputs.template = '*'
     datasource.inputs.sort_filelist = True
     datasource.inputs.raise_on_empty = False
-    datasource.inputs.field_template = dict(t1='%s/%s/T1.nii.gz', ct1='%s/%s/CT1.nii.gz',
-                                            t2='%s/%s/T2.nii.gz', flair='%s/%s/FLAIR.nii.gz',
-                                            reference='%s/%s/CT.nii.gz')
-    datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
-                                           ct1=[['sub_id', 'sessions']],
-                                           t2=[['sub_id', 'sessions']],
-                                           flair=[['sub_id', 'sessions']],
-                                           reference=[['sub_id', 'ref_ct']])
+    datasource.inputs.field_template = field_template
+    datasource.inputs.template_args = template_args
     datasource.inputs.sub_id = sub_id
     datasource.inputs.sessions = sessions
     datasource.inputs.ref_ct = 'REF'
@@ -282,7 +316,7 @@ def single_tp_segmentation_datasource(sub_id, BASE_DIR):
 def datasink_base(datasink, datasource, workflow, sessions, reference,
                   extra_nodes=[], t10=True):
 
-    sequences = SEQUENCES+extra_nodes
+    sequences = [REF_SEQUENCE]+SEQUENCES+extra_nodes
     split_ds_nodes = []
     for i in range(len(sequences)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))

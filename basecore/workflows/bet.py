@@ -5,12 +5,12 @@ from basecore.workflows.datahandler import datasink_base
 from nipype.interfaces.fsl.utils import Reorient2Std
 
 
-def brain_extraction(sub_id, datasource, sessions,
+def brain_extraction(sub_id, datasource, sessions, ref_sequence,
                      RESULT_DIR, NIPYPE_CACHE, reference, t10=True):
 
     bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet')
     bet.inputs.save_mask = 1
-    bet.inputs.out_file = 'T1_preproc'
+    bet.inputs.out_file = '{}_preproc'.format(ref_sequence.upper())
     
     reorient = nipype.MapNode(interface=Reorient2Std(), iterfield=['in_file'],
                               name='reorient')
@@ -33,7 +33,7 @@ def brain_extraction(sub_id, datasource, sessions,
     # Create Workflow
     workflow = nipype.Workflow('brain_extraction_workflow', base_dir=NIPYPE_CACHE)
 
-    workflow.connect(datasource, 't1', reorient, 'in_file')
+    workflow.connect(datasource, ref_sequence, reorient, 'in_file')
     workflow.connect(reorient, 'out_file', bet, 'input_file')
     if t10:
         workflow.connect(datasource, 't1_0', reorient_t10, 'in_file')

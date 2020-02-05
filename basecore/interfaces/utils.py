@@ -65,6 +65,8 @@ class DicomCheck(BaseInterface):
 #         tp = ''
 #         scan_name = dicom_dir.split('/')[-1]
         if scan_name in RT_NAMES:
+            if scan_name == 'RTDOSE':
+                scan_name = scan_name+'_{}'.format(img_paths[-1])
             if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
                 os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
             else:
@@ -100,9 +102,9 @@ class DicomCheck(BaseInterface):
         self.outdir = os.path.join(wd, sub_name, tp, scan_name)
         self.scan_name = scan_name
         self.base_dir = os.path.join(wd, sub_name, tp)
-        if scan_name == 'RTDOSE':
+        if 'RTDOSE' in scan_name:
             self.dose_file = glob.glob(os.path.join('/'.join(img_paths), '*.dcm'))[0]
-            self.dose_output = os.path.join(wd, sub_name, tp, 'RTDOSE.nii.gz')
+            self.dose_output = os.path.join(wd, sub_name, tp, '{}.nii.gz'.format(scan_name))
 
         return runtime
 
