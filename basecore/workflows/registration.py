@@ -9,8 +9,8 @@ from basecore.workflows.datahandler import datasink_base
 
 
 def brain_registration(sub_id, datasource, sessions, reference,
-                              result_dir, nipype_cache, bet_workflow=None,
-                              t10=False, sequences=[], ref_sequence=[]):
+                       result_dir, nipype_cache, bet_workflow=None,
+                       t10=False, sequences=[], ref_sequence=[]):
     """
     This is a workflow to register multi-modalities MR brain images to their 
     reference MR image, in multi or single time-point(s) cohort. In particular, for each 
@@ -277,5 +277,72 @@ def brain_registration(sub_id, datasource, sessions, reference,
     else:
         workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
                                  extra_nodes=['t1_bet'], t10=t10)
+
+    return workflow
+
+
+def apply_transformations(datasource, base_workflow, t10, reference, cache,
+                          sub_id, sessions, result_dir, to_transform=[],
+                          sequences=[], ref_sequence=[]):
+    
+    workflow = nipype.Workflow('tumor_segmentation_workflow',
+                               base_dir=cache)
+    datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
+
+    substitutions = [('subid', sub_id)]
+    for image in to_transform:
+        base_name = image.replace('.', '_')
+        outname = image.split('.')[0].upper()
+        if reference:
+            apply_ts_ref = nipype.MapNode(interface=ApplyTransforms(),
+                                          iterfield=['input_image', 'transforms'],
+                                          name='apply_ts_ref{}'.format(base_name))
+            apply_ts_ref.inputs.interpolation = 'NearestNeighbor'
+    
+            workflow.connect(datasource, 'reference', apply_ts_ref, 'reference_image')
+            if t10:
+                merge_ref_ts = nipype.MapNode(interface=Merge(3),
+                                              iterfield=['in1', 'in2', 'in3'],
+                                              name='merge_ct_ts{}'.format(base_name))
+                workflow.connect(datasource, 't12ct_mat', merge_ref_ts, 'in1')
+                workflow.connect(datasource, 'reg2t1_warp', merge_ref_ts, 'in2')
+                workflow.connect(datasource, 'reg2t1_mat', merge_ref_ts, 'in3')
+                workflow.connect(merge_ref_ts, 'out', apply_ts_ref, 'transforms')
+            else:
+                workflow.connect(datasource, 't12ct_mat', apply_ts_ref, 'transforms')
+            workflow.connect(base_workflow, image, apply_ts_ref, 'input_image')
+            workflow.connect(apply_ts_ref, 'output_image', datasink,
+                             'results.subid.@{}_reg2ref'.format(base_name))
+    
+        if t10:
+            merge_t10_ts = nipype.MapNode(interface=Merge(2),
+                                          iterfield=['in1', 'in2'],
+                                          name='merge_t10_ts{}'.format(base_name))
+            apply_ts_t10 = nipype.MapNode(interface=ApplyTransforms(),
+                                          iterfield=['input_image', 'transforms'],
+                                          name='apply_ts_t10{}'.format(base_name))
+            apply_ts_t10.inputs.interpolation = 'NearestNeighbor'
+    
+            workflow.connect(datasource, 't1_0', apply_ts_t10, 'reference_image')
+            workflow.connect(datasource, 'reg2t1_warp', merge_t10_ts, 'in1')
+            workflow.connect(datasource, 'reg2t1_mat', merge_t10_ts, 'in2')
+            workflow.connect(merge_t10_ts, 'out', apply_ts_t10, 'transforms')
+        
+            workflow.connect(base_workflow, image, apply_ts_t10, 'input_image')
+            workflow.connect(apply_ts_t10, 'output_image', datasink,
+                             'results.subid.@{}_reg2T10'.format(base_name))
+ 
+        for i, session in enumerate(sessions):
+            substitutions += [('_apply_ts_t10{0}{1}/{2}_trans.nii.gz'
+                               .format(base_name, i, to_transform[image]),
+                               session+'/'+'{}_reg2T1ref.nii.gz'.format(outname))]
+            substitutions += [('_apply_ts_ref{0}{1}/{2}_trans.nii.gz'
+                               .format(base_name, i, to_transform[image]),
+                               session+'/'+'{}_reg2CT.nii.gz'.format(outname))]
+
+    datasink.inputs.substitutions =substitutions
+    workflow = datasink_base(datasink, datasource, workflow, sessions,
+                             reference, t10=t10, sequences=sequences,
+                             ref_sequence=[ref_sequence])
 
     return workflow
