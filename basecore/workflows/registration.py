@@ -9,7 +9,7 @@ from basecore.workflows.datahandler import datasink_base
 
 
 def brain_registration(sub_id, datasource, sessions, reference,
-                       result_dir, nipype_cache, bet_workflow=None,
+                       result_dir, nipype_cache,
                        t10=False, sequences=[], ref_sequence=[]):
     """
     This is a workflow to register multi-modalities MR brain images to their 
@@ -215,10 +215,7 @@ def brain_registration(sub_id, datasource, sessions, reference,
                              'results.subid.@{}_reg2T1_ref_masked'.format(seq))
         # apply T1 mask to registered images
         workflow.connect(reg_nodes[seq], 'reg_file', apply_mask_nodes[seq], 'in_file')
-        if bet_workflow is not None:
-            workflow.connect(bet_workflow, 'bet.out_mask', apply_mask_nodes[seq], 'mask_file')
-        else:
-            workflow.connect(datasource, 't1_mask', apply_mask_nodes[seq], 'mask_file')
+        workflow.connect(datasource, 't1_mask', apply_mask_nodes[seq], 'mask_file')
         workflow.connect(apply_mask_nodes[seq], 'out_file', datasink,
                          'results.subid.@{}_preproc'.format(seq))
 
@@ -250,18 +247,11 @@ def brain_registration(sub_id, datasource, sessions, reference,
 
     if t10:
         for i, sess in enumerate(sessions):
-                if bet_workflow is not None:
-                    workflow.connect(bet_workflow, 't1_0_bet.out_mask',
-                                     fake_merge_t1, 'in{}'.format(i+1))
-                else:
-                    workflow.connect(datasource, 't1_0_mask',
-                                     fake_merge_t1, 'in{}'.format(i+1))
-        if bet_workflow is not None:
-            workflow.connect(bet_workflow, 'bet.out_file', reg2T1, 'input_file')
-            workflow.connect(bet_workflow, 't1_0_bet.out_file', reg2T1, 'ref_file')
-        else:
-            workflow.connect(datasource, 't1_bet', reg2T1, 'input_file')
-            workflow.connect(datasource, 't1_0_bet', reg2T1, 'ref_file')
+            workflow.connect(datasource, 't1_0_mask',
+                             fake_merge_t1, 'in{}'.format(i+1))
+
+        workflow.connect(datasource, 't1_bet', reg2T1, 'input_file')
+        workflow.connect(datasource, 't1_0_bet', reg2T1, 'ref_file')
         workflow.connect(reg2T1, 'warp_file', datasink,
                          'results.subid.@reg2CT_warp')
         workflow.connect(reg2T1, 'inv_warp', datasink,
@@ -271,12 +261,8 @@ def brain_registration(sub_id, datasource, sessions, reference,
         workflow.connect(reg2T1, 'regmat', datasink,
                          'results.subid.@reg2CT_mat')
 
-    if bet_workflow is not None:
-        workflow = datasink_base(datasink, datasource, workflow,
-                                 sessions, reference, t10=t10)
-    else:
-        workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
-                                 extra_nodes=['t1_bet'], t10=t10)
+    workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
+                             extra_nodes=['t1_bet'], t10=t10)
 
     return workflow
 

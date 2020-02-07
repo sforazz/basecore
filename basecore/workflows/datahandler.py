@@ -83,8 +83,6 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
 
     field_template, template_args, outfields = define_datasource_inputs(
         sequences, [ref_sequence])
-    
-    
 
     datasource = create_datasource(base_dir, sub_id, sessions,
                                    field_template, template_args, outfields)
@@ -92,95 +90,33 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
     return datasource, sessions, reference, t10, sequences, ref_sequence
 
 
-def registration_datasource(sub_id, BASE_DIR):
+def registration_datasource(sub_id, base_dir, xnat_source=False):
 
-    sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
-                if 'REF' not in x and 'T10' not in x and 'RT_' not in x
-                and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
-    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
-                    if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
-    if ref_session:
-        reference = True
+    base_ds, sessions, reference, t10, sequences, ref_sequence = base_datasource(sub_id, base_dir)
+    field_template = dict()
+    template_args = dict()
+
+    if t10:
+        field_template['t1_0'] = '%s/%s/T10.nii.gz'
+        field_template['t1_0_bet'] = '%s/%s/T1_0_bet.nii.gz'
+        field_template['t1_0_mask'] = '%s/%s/T1_0_bet_mask.nii.gz'
+        template_args['t1_0'] = [['sub_id', 'ref_t1']]
+        template_args['t1_0_bet'] = [['sub_id', 'ref_t1']]
+        template_args['t1_0_mask'] = [['sub_id', 'ref_t1']]
+
+    field_template.update(base_ds.inputs.field_template)
+    template_args.update(base_ds.inputs.template_args)
+    outfields = [x for x in field_template.keys()]
+
+    if xnat_source:
+        xnat_scan_ids = list(set([field_template[it].split('/')[-1].split('.')[0]
+                                  for it in field_template]))
     else:
-        print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        reference = False
-
-    datasource = nipype.Node(
-        interface=nipype.DataGrabber(
-            infields=['sub_id', 'sessions', 'ref_ct', 'ref_t1'],
-            outfields=['t1', 'ct1', 't2', 'flair', 'reference', 't1_0',
-                       't1_0_bet', 't1_bet', 't1_mask', 't1_0_mask']),
-            name='datasource')
-    datasource.inputs.base_directory = BASE_DIR
-    datasource.inputs.template = '*'
-    datasource.inputs.sort_filelist = True
-    datasource.inputs.raise_on_empty = False
-    datasource.inputs.field_template = dict(t1='%s/%s/T1.nii.gz', ct1='%s/%s/CT1.nii.gz',
-                                            t2='%s/%s/T2.nii.gz', flair='%s/%s/FLAIR.nii.gz',
-                                            reference='%s/%s/CT.nii.gz',
-                                            t1_0='%s/%s/T1.nii.gz',
-                                            t1_0_bet='%s/%s/T1_0_bet.nii.gz',
-                                            t1_0_mask='%s/%s/T1_0_bet_mask.nii.gz',
-                                            t1_bet='%s/%s/T1_preproc.nii.gz',
-                                            t1_mask='%s/%s/T1_preproc_mask.nii.gz')
-    datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
-                                           ct1=[['sub_id', 'sessions']],
-                                           t2=[['sub_id', 'sessions']],
-                                           flair=[['sub_id', 'sessions']],
-                                           reference=[['sub_id', 'ref_ct']],
-                                           t1_0=[['sub_id', 'ref_t1']],
-                                           t1_0_bet=[['sub_id', 'ref_t1']],
-                                           t1_0_mask=[['sub_id', 'ref_t1']],
-                                           t1_bet=[['sub_id', 'sessions']],
-                                           t1_mask=[['sub_id', 'sessions']])
-    datasource.inputs.sub_id = sub_id
-    datasource.inputs.sessions = sessions
-    datasource.inputs.ref_ct = 'REF'
-    datasource.inputs.ref_t1 = 'T10'
+        xnat_scan_ids = []
+    datasource = create_datasource(base_dir, sub_id, sessions,field_template,
+                                   template_args, outfields)
     
-    return datasource, sessions, reference
-
-
-def single_tp_registration_datasource(sub_id, BASE_DIR):
-
-    sessions = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
-                if 'REF' not in x and 'RT_' not in x
-                and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
-    ref_session = [x for x in os.listdir(os.path.join(BASE_DIR, sub_id))
-                    if x == 'REF' and os.path.isdir(os.path.join(BASE_DIR, sub_id, x))]
-    if ref_session:
-        reference = True
-    else:
-        print('NO REFERENCE CT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        reference = False
-
-    datasource = nipype.Node(
-        interface=nipype.DataGrabber(
-            infields=['sub_id', 'sessions', 'ref_ct'],
-            outfields=['t1', 'ct1', 't2', 'flair', 'reference',
-                       't1_bet', 't1_mask']),
-            name='datasource')
-    datasource.inputs.base_directory = BASE_DIR
-    datasource.inputs.template = '*'
-    datasource.inputs.sort_filelist = True
-    datasource.inputs.raise_on_empty = False
-    datasource.inputs.field_template = dict(t1='%s/%s/T1.nii.gz', ct1='%s/%s/CT1.nii.gz',
-                                            t2='%s/%s/T2.nii.gz', flair='%s/%s/FLAIR.nii.gz',
-                                            reference='%s/%s/CT.nii.gz',
-                                            t1_bet='%s/%s/T1_preproc.nii.gz',
-                                            t1_mask='%s/%s/T1_preproc_mask.nii.gz')
-    datasource.inputs.template_args = dict(t1=[['sub_id', 'sessions']],
-                                           ct1=[['sub_id', 'sessions']],
-                                           t2=[['sub_id', 'sessions']],
-                                           flair=[['sub_id', 'sessions']],
-                                           reference=[['sub_id', 'ref_ct']],
-                                           t1_bet=[['sub_id', 'sessions']],
-                                           t1_mask=[['sub_id', 'sessions']])
-    datasource.inputs.sub_id = sub_id
-    datasource.inputs.sessions = sessions
-    datasource.inputs.ref_ct = 'REF'
-    
-    return datasource, sessions, reference
+    return datasource, sessions, reference, t10, sequences, ref_sequence, xnat_scan_ids
 
 
 def segmentation_datasource(sub_id, base_dir, apply_transform=False, xnat_source=False):
