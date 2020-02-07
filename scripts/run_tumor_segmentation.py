@@ -53,9 +53,9 @@ if __name__ == "__main__":
     RESULT_DIR = os.path.join(ARGS.work_dir, 'segmentation_results')
     CLEAN_CACHE = ARGS.clean_cache
 
-    if os.path.isdir(BASE_DIR) and not ARGS.xnat_source:
+    if (os.path.isdir(BASE_DIR) and ARGS.xnat_source) or os.path.isdir(BASE_DIR):
         sub_list = os.listdir(BASE_DIR)
-    elif ARGS.xnat_source:
+    elif ARGS.xnat_source and not os.path.isdir(BASE_DIR):
         BASE_DIR = os.path.join(BASE_DIR, 'xnat_cache')
         sub_list = get_subject_list(
             ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
 
         datasource, sessions, reference, t10, sequences, ref_sequence, xnat_scans = segmentation_datasource(
-            sub_id, BASE_DIR, apply_transform=True)
+            sub_id, BASE_DIR, apply_transform=True, xnat_source=ARGS.xnat_source)
 
         if ARGS.xnat_source:
             get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,

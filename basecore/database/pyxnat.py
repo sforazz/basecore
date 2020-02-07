@@ -160,33 +160,34 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
                       'restart a job, so I will check for already downloaded resources '
                       'in order to speed up the process.'.format(folder_path))
             scans = xnat_session.scans().get()
-            print(scans)
+            if needed_scans:
+                scans = [x for x in scans if x in needed_scans]
+
             for scan_id in scans:
-                if needed_scans and scan_id in needed_scans:
-                    xnat_scan = xnat_session.scan(scan_id)
-                    resources = xnat_scan.resources().get()
-                    for res_id in resources:
-                        xnat_resource = xnat_scan.resource(res_id)
-                        files = xnat_resource.files().get()
-                        for file_id in files:
-                            downloaded = False
-                            scan_name = xnat_resource.file(file_id).label()
-                            if not os.path.isfile(os.path.join(folder_path, scan_name)):
-                                print('Downloading resource {} ...'.format(scan_name))
-                                while not downloaded:
-                                    try:
-                                        xnat_resource.file(file_id).get_copy(
-                                            os.path.join(folder_path, scan_name))
-                                        downloaded = True
-                                    except ConnectionError:
-                                        print('Connection lost during download. Try again...')
-                                    except:
-                                        print('Could not download {0} for session {1} '
-                                              'in subject {2}. Please try again later'
-                                              .format(scan_name, session_name, sub_name))
-                                        failed.append([sub_name, session_name, scan_name])
-                            else:
-                                print('{} already downloaded, skiping it.'.format(scan_name))
+                xnat_scan = xnat_session.scan(scan_id)
+                resources = xnat_scan.resources().get()
+                for res_id in resources:
+                    xnat_resource = xnat_scan.resource(res_id)
+                    files = xnat_resource.files().get()
+                    for file_id in files:
+                        downloaded = False
+                        scan_name = xnat_resource.file(file_id).label()
+                        if not os.path.isfile(os.path.join(folder_path, scan_name)):
+                            print('Downloading resource {} ...'.format(scan_name))
+                            while not downloaded:
+                                try:
+                                    xnat_resource.file(file_id).get_copy(
+                                        os.path.join(folder_path, scan_name))
+                                    downloaded = True
+                                except ConnectionError:
+                                    print('Connection lost during download. Try again...')
+                                except:
+                                    print('Could not download {0} for session {1} '
+                                          'in subject {2}. Please try again later'
+                                          .format(scan_name, session_name, sub_name))
+                                    failed.append([sub_name, session_name, scan_name])
+                        else:
+                            print('{} already downloaded, skiping it.'.format(scan_name))
     if failed:
         with open(cache_dir+'/failed_download.txt', 'w') as f:
             for line in failed:
