@@ -61,26 +61,24 @@ class DicomCheck(BaseInterface):
         name_index = img_paths.index(scan_name)
         tp = img_paths[name_index-1]
         sub_name = img_paths[name_index-2]
-#         tp = dicom_dir.split('/')[-3]
-#         tp = ''
-#         scan_name = dicom_dir.split('/')[-1]
+        outdir = os.path.abspath(os.path.join(sub_name, tp, scan_name))
         if scan_name in RT_NAMES:
             if scan_name == 'RTDOSE':
                 scan_name = scan_name+'_{}'.format(img_paths[-1])
-            if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
-                os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+            if not os.path.isdir(outdir):
+                os.makedirs(outdir)
             else:
-                shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
-                os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                shutil.rmtree(outdir)
+                os.makedirs(outdir)
             files = sorted(os.listdir(dicom_dir))
             for item in files:
                 curr_item = os.path.join(dicom_dir, item)
                 if os.path.isdir(curr_item):
-                    shutil.copytree(curr_item, os.path.join(wd, sub_name, tp, scan_name, item))
+                    shutil.copytree(curr_item, os.path.join(outdir, item))
                 else:
-                    shutil.copy2(curr_item, os.path.join(wd, sub_name, tp, scan_name))
+                    shutil.copy2(curr_item, outdir)
                 if scan_name == 'RTSTRUCT' and '1-' in item:
-                    rt_folder = os.path.join(wd, sub_name, tp, scan_name, item)
+                    rt_folder = os.path.join(outdir, item)
                     rt_dcm = glob.glob(rt_folder+'/*.dcm')[0]
                     ds = pd.read_file(rt_dcm)
                     regex = re.compile('[^a-zA-Z]')
@@ -92,19 +90,20 @@ class DicomCheck(BaseInterface):
             dicoms, im_types, series_nums = self.dcm_info()
             dicoms = self.dcm_check(dicoms, im_types, series_nums)
             if dicoms:
-                if not os.path.isdir(os.path.join(wd, sub_name, tp, scan_name)):
-                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                if not os.path.isdir(outdir):
+                    os.makedirs(outdir)
                 else:
-                    shutil.rmtree(os.path.join(wd, sub_name, tp, scan_name))
-                    os.makedirs(os.path.join(wd, sub_name, tp, scan_name))
+                    shutil.rmtree(outdir)
+                    os.makedirs(outdir)
                 for d in dicoms:
-                    shutil.copy2(d, os.path.join(wd, sub_name, tp, scan_name))
-        self.outdir = os.path.join(wd, sub_name, tp, scan_name)
+                    shutil.copy2(d, outdir)
+        self.outdir = outdir
         self.scan_name = scan_name
-        self.base_dir = os.path.join(wd, sub_name, tp)
+        self.base_dir = os.path.abspath(os.path.join(sub_name, tp))
         if 'RTDOSE' in scan_name:
             self.dose_file = glob.glob(os.path.join('/'.join(img_paths), '*.dcm'))[0]
-            self.dose_output = os.path.join(wd, sub_name, tp, '{}.nii.gz'.format(scan_name))
+            self.dose_output = os.path.abspath(os.path.join(
+                sub_name, tp, '{}.nii.gz'.format(scan_name)))
 
         return runtime
 

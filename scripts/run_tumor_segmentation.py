@@ -92,17 +92,12 @@ if __name__ == "__main__":
                 sub_id, sessions, RESULT_DIR, sequences=sequences,
                 ref_sequence=ref_sequence, to_transform=to_transform)
 
-        workflow_runner.run(plugin='Linear')
-        if ARGS.xnat_sink:
-            print('Uploading the results to XNAT with the following parameters:')
-            print('Server: {}'.format(ARGS.xnat_url))
-            print('Project ID: {}'.format(ARGS.xnat_pid))
-            print('User ID: {}'.format(ARGS.xnat_user))
+        workflow_runner.run(plugin='Linear', plugin_args={'job_finished_timeout': 15})
 
+        if ARGS.xnat_sink:
             xnat_datasink(ARGS.xnat_pid, sub_id, os.path.join(RESULT_DIR, 'results'),
                           ARGS.xnat_user, ARGS.xnat_pwd, url=ARGS.xnat_url, processed=True)
 
-            print('Uploading successfully completed!')
         if CLEAN_CACHE:
             shutil.rmtree(NIPYPE_CACHE)
 
