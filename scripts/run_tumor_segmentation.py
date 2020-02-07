@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
         if ARGS.xnat_source:
             skip_sessions = check_already_downloaded(sessions, xnat_scans, sub_id, BASE_DIR)
-            if not [x for x in sessions if x not in skip_sessions]:
+            if [x for x in sessions if x not in skip_sessions]:
                 get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
                     url=ARGS.xnat_url, processed=True, subjects=[sub_id], needed_scans=xnat_scans,
                     skip_sessions=skip_sessions)

@@ -166,7 +166,8 @@ def datasink_base(datasink, datasource, workflow, sessions, reference,
                   extra_nodes=[], t10=True, sequences=[], ref_sequence=[]):
 
 #     sequences1 = ref_sequence+sequences+extra_nodes
-    sequences1 = list(datasource.inputs.field_template.keys())
+    sequences1 = [x for x in datasource.inputs.field_template.keys()
+                  if x!='t1_0' and x!='reference']
     split_ds_nodes = []
     for i in range(len(sequences1)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))

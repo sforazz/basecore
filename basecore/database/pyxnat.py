@@ -140,18 +140,17 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
             print('Found {0} sessions for subject {1}'.format(len(sessions), sub_name))
 
         for session_id in sessions:
-            if session_id not in skip_sessions:
-                xnat_session = xnat_sub.experiment(session_id)
-                if len(xnat_session.label().split('_')) == 3:
-                    session_name = xnat_session.label().split('_')[1]
-                elif len(xnat_session.label().split('_')) == 4:
-                    session_name = xnat_session.label().split('_')[2]
-                else:
-                    print('WARNING: The session name seems to be different from '
-                          'the convention used in the current workflow. It will be '
-                          'taken equal to the session label from XNAT.')
-                    session_name = xnat_session.label().split('_')
-    
+            xnat_session = xnat_sub.experiment(session_id)
+            if len(xnat_session.label().split('_')) == 3:
+                session_name = xnat_session.label().split('_')[1]
+            elif len(xnat_session.label().split('_')) == 4:
+                session_name = xnat_session.label().split('_')[2]
+            else:
+                print('WARNING: The session name seems to be different from '
+                      'the convention used in the current workflow. It will be '
+                      'taken equal to the session label from XNAT.')
+                session_name = xnat_session.label().split('_')
+            if session_name not in skip_sessions:
                 print('\nProcessing session {}\n'.format(session_name))
                 folder_path = os.path.join(cache_dir, sub_name, session_name)
                 if not os.path.isdir(folder_path):
