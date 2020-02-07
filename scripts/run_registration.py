@@ -6,6 +6,7 @@ from basecore.workflows.datahandler import (
     registration_datasource, xnat_datasink)
 from basecore.workflows.registration import brain_registration
 from basecore.database.pyxnat import get
+from basecore.utils.utils import check_already_downloaded
 
 
 if __name__ == "__main__":
@@ -64,8 +65,11 @@ if __name__ == "__main__":
         datasource, sessions, reference, t10, sequences, ref_sequence, xnat_scans = registration_datasource(
             sub_id, BASE_DIR)
         if ARGS.xnat_source:
-            get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
-                url=ARGS.xnat_url, processed=True, subjects=[sub_id], needed_scans=xnat_scans)
+            skip_sessions = check_already_downloaded(sessions, xnat_scans, sub_id, BASE_DIR)
+            if not [x for x in sessions if x not in skip_sessions]:
+                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                    url=ARGS.xnat_url, processed=True, subjects=[sub_id], needed_scans=xnat_scans,
+                    skip_sessions=skip_sessions)
 
         workflow = brain_registration(
             sub_id, datasource, sessions, reference, RESULT_DIR,

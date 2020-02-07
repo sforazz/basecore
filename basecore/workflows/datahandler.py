@@ -31,17 +31,22 @@ def create_datasource(base_dir, sub_id, sessions, field_template,
     return datasource
 
 
-def define_datasource_inputs(sequences, ref, t10=True):
+def define_datasource_inputs(sequences, ref_sequence, t10, reference):
 
-    field_template = dict(reference='%s/%s/CT.nii.gz',
-                          t1_0='%s/%s/T1.nii.gz')
-    template_args = dict(reference=[['sub_id', 'ref_ct']],
-                         t1_0=[['sub_id', 'ref_t1']])
-    for seq in ref+sequences:
+    field_template = dict()
+    template_args = dict()
+    if t10:
+        field_template['t1_0'] = '%s/%s/T1.nii.gz'
+        template_args['t1_0'] = [['sub_id', 'ref_t1']]
+    if reference:
+        field_template['reference'] = '%s/%s/CT.nii.gz'
+        template_args['reference'] = [['sub_id', 'ref_ct']]
+    
+    for seq in ref_sequence+sequences:
         field_template[seq] = '%s/%s/{}.nii.gz'.format(seq.upper())
         template_args[seq] = [['sub_id', 'sessions']]
     
-    outfields = ref+sequences+['reference']
+    outfields = ref_sequence+sequences+['reference']
     if t10:
         outfields.append('t1_0')
 
@@ -66,6 +71,8 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
             ref_sequence = 't1'
         elif 'ct1' in sequences:
             ref_sequence = 'ct1'
+        elif 't1km' in sequences:
+            ref_sequence = 't1km'
         else:
             raise Exception('Nor T1 neither T1KM were found in {}. You need at least one of them '
                             'in order to perform registration.'.format(sub_id))
@@ -82,7 +89,7 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
         t10 = False
 
     field_template, template_args, outfields = define_datasource_inputs(
-        sequences, [ref_sequence])
+        sequences, [ref_sequence], t10, reference)
 
     datasource = create_datasource(base_dir, sub_id, sessions,
                                    field_template, template_args, outfields)
@@ -103,6 +110,10 @@ def registration_datasource(sub_id, base_dir, xnat_source=False):
         template_args['t1_0'] = [['sub_id', 'ref_t1']]
         template_args['t1_0_bet'] = [['sub_id', 'ref_t1']]
         template_args['t1_0_mask'] = [['sub_id', 'ref_t1']]
+    field_template['t1_bet'] = '%s/%s/{}_preproc.nii.gz'.format(ref_sequence.upper())
+    field_template['t1_mask'] = '%s/%s/{}_preproc_mask.nii.gz'.format(ref_sequence.upper())
+    template_args['t1_bet'] = [['sub_id', 'sessions']]
+    template_args['t1_mask'] = [['sub_id', 'sessions']]
 
     field_template.update(base_ds.inputs.field_template)
     template_args.update(base_ds.inputs.template_args)
@@ -154,7 +165,8 @@ def segmentation_datasource(sub_id, base_dir, apply_transform=False, xnat_source
 def datasink_base(datasink, datasource, workflow, sessions, reference,
                   extra_nodes=[], t10=True, sequences=[], ref_sequence=[]):
 
-    sequences1 = ref_sequence+sequences+extra_nodes
+#     sequences1 = ref_sequence+sequences+extra_nodes
+    sequences1 = list(datasource.inputs.field_template.keys())
     split_ds_nodes = []
     for i in range(len(sequences1)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))

@@ -7,6 +7,7 @@ from basecore.workflows.datahandler import (
     segmentation_datasource, xnat_datasink)
 from basecore.database.pyxnat import get
 from basecore.database.base import get_subject_list
+from basecore.utils.utils import check_already_downloaded
 
 
 if __name__ == "__main__":
@@ -70,8 +71,11 @@ if __name__ == "__main__":
             sub_id, BASE_DIR, apply_transform=True, xnat_source=ARGS.xnat_source)
 
         if ARGS.xnat_source:
-            get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
-                url=ARGS.xnat_url, processed=True, subjects=[sub_id], needed_scans=xnat_scans)
+            skip_sessions = check_already_downloaded(sessions, xnat_scans, sub_id, BASE_DIR)
+            if not [x for x in sessions if x not in skip_sessions]:
+                get(ARGS.xnat_pid, BASE_DIR, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+                    url=ARGS.xnat_url, processed=True, subjects=[sub_id], needed_scans=xnat_scans,
+                    skip_sessions=skip_sessions)
 
         workflow_runner, hd_glio = tumor_segmentation(
             datasource, sub_id, sessions, ARGS.gtv_seg_model_dir,

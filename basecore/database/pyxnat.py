@@ -98,7 +98,7 @@ def put(project, subject, sessions, sub_folder, config=None, url=None, pwd=None,
 
 
 def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, processed=True,
-        subjects=[], needed_scans=[]):
+        subjects=[], needed_scans=[], skip_sessions=[]):
     "Function to download ALL the subject/sessions/scans from one project."
     "If processed=True, only the processed sessions will be downloaded, "
     "otherwise only the not-processed (i.e. the sessions with raw data)."
@@ -140,54 +140,55 @@ def get(project_id, cache_dir, config=None, url=None, pwd=None, user=None, proce
             print('Found {0} sessions for subject {1}'.format(len(sessions), sub_name))
 
         for session_id in sessions:
-            xnat_session = xnat_sub.experiment(session_id)
-            if len(xnat_session.label().split('_')) == 3:
-                session_name = xnat_session.label().split('_')[1]
-            elif len(xnat_session.label().split('_')) == 4:
-                session_name = xnat_session.label().split('_')[2]
-            else:
-                print('WARNING: The session name seems to be different from '
-                      'the convention used in the current workflow. It will be '
-                      'taken equal to the session label from XNAT.')
-                session_name = xnat_session.label().split('_')
-
-            print('\nProcessing session {}\n'.format(session_name))
-            folder_path = os.path.join(cache_dir, sub_name, session_name)
-            if not os.path.isdir(folder_path):
-                os.makedirs(folder_path)
-            else:
-                print('{} already exists. This might mean that you are trying to '
-                      'restart a job, so I will check for already downloaded resources '
-                      'in order to speed up the process.'.format(folder_path))
-            scans = xnat_session.scans().get()
-            if needed_scans:
-                scans = [x for x in scans if x in needed_scans]
-
-            for scan_id in scans:
-                xnat_scan = xnat_session.scan(scan_id)
-                resources = xnat_scan.resources().get()
-                for res_id in resources:
-                    xnat_resource = xnat_scan.resource(res_id)
-                    files = xnat_resource.files().get()
-                    for file_id in files:
-                        downloaded = False
-                        scan_name = xnat_resource.file(file_id).label()
-                        if not os.path.isfile(os.path.join(folder_path, scan_name)):
-                            print('Downloading resource {} ...'.format(scan_name))
-                            while not downloaded:
-                                try:
-                                    xnat_resource.file(file_id).get_copy(
-                                        os.path.join(folder_path, scan_name))
-                                    downloaded = True
-                                except ConnectionError:
-                                    print('Connection lost during download. Try again...')
-                                except:
-                                    print('Could not download {0} for session {1} '
-                                          'in subject {2}. Please try again later'
-                                          .format(scan_name, session_name, sub_name))
-                                    failed.append([sub_name, session_name, scan_name])
-                        else:
-                            print('{} already downloaded, skiping it.'.format(scan_name))
+            if session_id not in skip_sessions:
+                xnat_session = xnat_sub.experiment(session_id)
+                if len(xnat_session.label().split('_')) == 3:
+                    session_name = xnat_session.label().split('_')[1]
+                elif len(xnat_session.label().split('_')) == 4:
+                    session_name = xnat_session.label().split('_')[2]
+                else:
+                    print('WARNING: The session name seems to be different from '
+                          'the convention used in the current workflow. It will be '
+                          'taken equal to the session label from XNAT.')
+                    session_name = xnat_session.label().split('_')
+    
+                print('\nProcessing session {}\n'.format(session_name))
+                folder_path = os.path.join(cache_dir, sub_name, session_name)
+                if not os.path.isdir(folder_path):
+                    os.makedirs(folder_path)
+                else:
+                    print('{} already exists. This might mean that you are trying to '
+                          'restart a job, so I will check for already downloaded resources '
+                          'in order to speed up the process.'.format(folder_path))
+                scans = xnat_session.scans().get()
+                if needed_scans:
+                    scans = [x for x in scans if x in needed_scans]
+    
+                for scan_id in scans:
+                    xnat_scan = xnat_session.scan(scan_id)
+                    resources = xnat_scan.resources().get()
+                    for res_id in resources:
+                        xnat_resource = xnat_scan.resource(res_id)
+                        files = xnat_resource.files().get()
+                        for file_id in files:
+                            downloaded = False
+                            scan_name = xnat_resource.file(file_id).label()
+                            if not os.path.isfile(os.path.join(folder_path, scan_name)):
+                                print('Downloading resource {} ...'.format(scan_name))
+                                while not downloaded:
+                                    try:
+                                        xnat_resource.file(file_id).get_copy(
+                                            os.path.join(folder_path, scan_name))
+                                        downloaded = True
+                                    except ConnectionError:
+                                        print('Connection lost during download. Try again...')
+                                    except:
+                                        print('Could not download {0} for session {1} '
+                                              'in subject {2}. Please try again later'
+                                              .format(scan_name, session_name, sub_name))
+                                        failed.append([sub_name, session_name, scan_name])
+                            else:
+                                print('{} already downloaded, skiping it.'.format(scan_name))
     if failed:
         with open(cache_dir+'/failed_download.txt', 'w') as f:
             for line in failed:

@@ -261,8 +261,9 @@ def brain_registration(sub_id, datasource, sessions, reference,
         workflow.connect(reg2T1, 'regmat', datasink,
                          'results.subid.@reg2CT_mat')
 
-    workflow = datasink_base(datasink, datasource, workflow, sessions, reference,
-                             extra_nodes=['t1_bet'], t10=t10)
+    workflow = datasink_base(datasink, datasource, workflow, sessions,
+                             reference, t10=t10, sequences=sequences,
+                             ref_sequence=[ref_sequence])
 
     return workflow
 
