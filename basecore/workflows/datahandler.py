@@ -200,15 +200,20 @@ def xnat_datasink(project_id, sub_id, result_dir, user, pwd,
                   url='https://central.xnat.org', processed=True,
                   overwrite=False):
 
-    print('Uploading the results to XNAT with the following parameters:')
-    print('Server: {}'.format(url))
-    print('Project ID: {}'.format(project_id))
-    print('User ID: {}'.format(user))
-
     sub_folder = os.path.join(result_dir, sub_id)
     sessions = [x for x in sorted(os.listdir(sub_folder))
                 if os.path.isdir(os.path.join(sub_folder, x))]
-    put(project_id, sub_id, sessions, sub_folder, url=url,
-        pwd=pwd, user=user, processed=processed, overwrite=overwrite)
-    
-    print('Uploading successfully completed!')
+    if os.path.isfile(os.path.join(sub_folder, 'xnat_datasink_successfullly_completed')):
+        print('Subject already uploaded to XNAT. Skiping uploading.')
+    else:
+        print('Uploading the results to XNAT with the following parameters:')
+        print('Server: {}'.format(url))
+        print('Project ID: {}'.format(project_id))
+        print('User ID: {}'.format(user))
+
+        put(project_id, sub_id, sessions, sub_folder, url=url,
+            pwd=pwd, user=user, processed=processed, overwrite=overwrite)
+        with open(os.path.join(sub_folder, 'xnat_datasink_successfullly_completed'),
+                  'w') as f:
+            f.write('Done!')
+        print('Uploading successfully completed!')
