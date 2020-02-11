@@ -10,7 +10,7 @@ POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair']
 
 
 def create_datasource(base_dir, sub_id, sessions, field_template,
-                      template_args, outfields):
+                      template_args, outfields, rt_session):
     
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
@@ -27,11 +27,12 @@ def create_datasource(base_dir, sub_id, sessions, field_template,
     datasource.inputs.sessions = sessions
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
+    datasource.inputs.rt = rt_session
     
     return datasource
 
 
-def define_datasource_inputs(sequences, ref_sequence, t10, reference):
+def define_datasource_inputs(sequences, ref_sequence, t10, reference, rt):
 
     field_template = dict()
     template_args = dict()
@@ -41,14 +42,21 @@ def define_datasource_inputs(sequences, ref_sequence, t10, reference):
     if reference:
         field_template['reference'] = '%s/%s/CT.nii.gz'
         template_args['reference'] = [['sub_id', 'ref_ct']]
+    if rt:
+        field_template['rt'] = '%s/%s'
+        template_args['rt'] = [['sub_id', 'rt']]
     
     for seq in ref_sequence+sequences:
         field_template[seq] = '%s/%s/{}.nii.gz'.format(seq.upper())
         template_args[seq] = [['sub_id', 'sessions']]
     
-    outfields = ref_sequence+sequences+['reference']
+    outfields = ref_sequence+sequences
+    if reference:
+        outfields.append('reference')
     if t10:
         outfields.append('t1_0')
+    if rt:
+        outfields.append('rt')
 
     return field_template, template_args, outfields
 
@@ -61,6 +69,8 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
                    if x == 'REF' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
     t10_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                    if x == 'T10' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
+    rt_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
+                   if 'RT_' in x and os.path.isdir(os.path.join(base_dir, sub_id, x))]
 
     if sequences is None or ref_sequence is None:
         sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
@@ -87,12 +97,18 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
         t10 = True
     else:
         t10 = False
+    
+    if rt_session:
+        rt = True
+    else:
+        rt = False
 
     field_template, template_args, outfields = define_datasource_inputs(
-        sequences, [ref_sequence], t10, reference)
+        sequences, [ref_sequence], t10, reference, rt)
 
     datasource = create_datasource(base_dir, sub_id, sessions,
-                                   field_template, template_args, outfields)
+                                   field_template, template_args, outfields,
+                                   rt_session[0])
     
     return datasource, sessions, reference, t10, sequences, ref_sequence
 
@@ -167,7 +183,10 @@ def datasink_base(datasink, datasource, workflow, sessions, reference,
 
 #     sequences1 = ref_sequence+sequences+extra_nodes
     sequences1 = [x for x in datasource.inputs.field_template.keys()
-                  if x!='t1_0' and x!='reference']
+                  if x!='t1_0' and x!='reference' and x!='rt']
+    rt = [x for x in datasource.inputs.field_template.keys()
+          if x=='rt']
+
     split_ds_nodes = []
     for i in range(len(sequences1)):
         split_ds = nipype.Node(interface=Split(), name='split_ds{}'.format(i))
@@ -193,6 +212,9 @@ def datasink_base(datasink, datasource, workflow, sessions, reference,
     if t10:
         workflow.connect(datasource, 't1_0', datasink,
                          'results.subid.T10.@ref_t1')
+    if rt:
+        workflow.connect(datasource, 'rt', datasink,
+                         'results.subid.@rt')
     return workflow
 
 
