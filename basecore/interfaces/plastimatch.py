@@ -8,7 +8,7 @@ class DoseConverterInputSpecs(CommandLineInputSpec):
     
     input_dose = File(mandatory=True, exists=True, argstr='--input %s',
                       desc='Dose DICOM file.')
-    out_name = traits.Str(default='dose.nii.gz', usedefault=True,
+    out_name = traits.Str('dose.nii.gz', usedefault=True,
                           argstr='--output-dose-img %s', desc='Output name. '
                           'Default is dose.nii.gz.')
 

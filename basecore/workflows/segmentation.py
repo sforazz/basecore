@@ -102,7 +102,6 @@ def tumor_segmentation(datasource, sub_id, sessions, gtv_model,
                      'results.subid.@tumor_seg_2mods')
 
     workflow = datasink_base(datasink, datasource, workflow, sessions,
-                             reference, t10=t10, sequences=orig_sequences,
-                             ref_sequence=ref_sequence)
+                             reference, t10=t10)
 
     return workflow, hd_glio

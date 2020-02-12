@@ -262,8 +262,7 @@ def brain_registration(sub_id, datasource, sessions, reference,
                          'results.subid.@reg2CT_mat')
 
     workflow = datasink_base(datasink, datasource, workflow, sessions,
-                             reference, t10=t10, sequences=sequences,
-                             ref_sequence=[ref_sequence])
+                             reference, t10=t10)
 
     return workflow
 
@@ -329,7 +328,6 @@ def apply_transformations(datasource, base_workflow, t10, reference, cache,
 
     datasink.inputs.substitutions =substitutions
     workflow = datasink_base(datasink, datasource, workflow, sessions,
-                             reference, t10=t10, sequences=sequences,
-                             ref_sequence=[ref_sequence])
+                             reference, t10=t10)
 
     return workflow

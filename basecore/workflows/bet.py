@@ -49,7 +49,6 @@ def brain_extraction(sub_id, datasource, sessions, ref_sequence, sequences,
                      'results.subid.@T1_mask')
 
     workflow = datasink_base(datasink, datasource, workflow, sessions,
-                             reference, t10=t10, sequences=sequences,
-                             ref_sequence=[ref_sequence])
+                             reference, t10=t10)
 
     return workflow

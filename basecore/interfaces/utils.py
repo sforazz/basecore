@@ -33,14 +33,14 @@ NotCompressedPixelTransferSyntaxes = [ExplicitVRLittleEndian,
 class DicomCheckInputSpec(BaseInterfaceInputSpec):
 
     dicom_dir = Directory(exists=True, desc='Directory with the DICOM files to check')
-    working_dir = Directory(exists=True, desc='Base directory to save the corrected DICOM files')
+    working_dir = Directory('checked_dicoms', usedefault=True,
+                            desc='Base directory to save the corrected DICOM files')
 
 
 class DicomCheckOutputSpec(TraitedSpec):
 
     outdir = Directory(exists=True, desc='Path to the directory with the corrected DICOM files')
     scan_name = traits.Str(desc='Scan name')
-    base_dir = Directory(exists=True, desc='Root path of outdir')
     dose_file = File(desc='Dose file, if any')
     dose_output = File()
 
@@ -53,7 +53,7 @@ class DicomCheck(BaseInterface):
     def _run_interface(self, runtime):
 
         dicom_dir = self.inputs.dicom_dir
-        wd = self.inputs.working_dir
+        wd = os.path.abspath(self.inputs.working_dir)
         self.dose_file = None
 
         img_paths = dicom_dir.split('/')
@@ -61,25 +61,20 @@ class DicomCheck(BaseInterface):
         name_index = img_paths.index(scan_name)
         tp = img_paths[name_index-1]
         sub_name = img_paths[name_index-2]
-        outdir = os.path.abspath(os.path.join(sub_name, tp, scan_name))
         if scan_name in RT_NAMES:
             if scan_name == 'RTDOSE':
-                scan_name = scan_name+'_{}'.format(img_paths[-1])
-            if not os.path.isdir(outdir):
-                os.makedirs(outdir)
-            else:
-                shutil.rmtree(outdir)
-                os.makedirs(outdir)
-            files = sorted(os.listdir(dicom_dir))
-            for item in files:
+                scan_name = scan_name+'_{}.nii.gz'.format(img_paths[-1])
+            dicoms = sorted(os.listdir(dicom_dir))
+            if not os.path.isdir(wd):
+                os.makedirs(wd)
+            for item in dicoms:
                 curr_item = os.path.join(dicom_dir, item)
                 if os.path.isdir(curr_item):
-                    shutil.copytree(curr_item, os.path.join(outdir, item))
+                    shutil.copytree(curr_item, wd)
                 else:
-                    shutil.copy2(curr_item, outdir)
-                if scan_name == 'RTSTRUCT' and '1-' in item:
-                    rt_folder = os.path.join(outdir, item)
-                    rt_dcm = glob.glob(rt_folder+'/*.dcm')[0]
+                    shutil.copy2(curr_item, os.path.join(wd, item))
+                if scan_name == 'RTSTRUCT':
+                    rt_dcm = glob.glob(wd+'/*.dcm')[0]
                     ds = pd.read_file(rt_dcm)
                     regex = re.compile('[^a-zA-Z]')
                     for i in range(len(ds.StructureSetROISequence)):
@@ -90,20 +85,15 @@ class DicomCheck(BaseInterface):
             dicoms, im_types, series_nums = self.dcm_info()
             dicoms = self.dcm_check(dicoms, im_types, series_nums)
             if dicoms:
-                if not os.path.isdir(outdir):
-                    os.makedirs(outdir)
-                else:
-                    shutil.rmtree(outdir)
-                    os.makedirs(outdir)
-                for d in dicoms:
-                    shutil.copy2(d, outdir)
-        self.outdir = outdir
+                if not os.path.isdir(wd):
+                    os.makedirs(wd)
+                    for d in dicoms:
+                        shutil.copy2(d, wd)
+        self.outdir = wd
         self.scan_name = scan_name
-        self.base_dir = os.path.abspath(os.path.join(sub_name, tp))
         if 'RTDOSE' in scan_name:
             self.dose_file = glob.glob(os.path.join('/'.join(img_paths), '*.dcm'))[0]
-            self.dose_output = os.path.abspath(os.path.join(
-                sub_name, tp, '{}.nii.gz'.format(scan_name)))
+            self.dose_output = os.path.join(wd, sub_name, tp, '{}.nii.gz'.format(scan_name))
 
         return runtime
 
@@ -111,7 +101,6 @@ class DicomCheck(BaseInterface):
         outputs = self._outputs().get()
         outputs['outdir'] = self.outdir
         outputs['scan_name'] = self.scan_name
-        outputs['base_dir'] = self.base_dir
         if self.dose_file is not None:
             outputs['dose_file'] = self.dose_file
             outputs['dose_output'] = self.dose_output
@@ -238,58 +227,53 @@ class ConversionCheck(BaseInterface):
 
         converted = self.inputs.in_file
         scan_name = self.inputs.file_name
-
+        
+        converted_old = converted[:]
         to_remove = []
         base_dir = os.path.dirname(converted[0])
         extra = [x for x in converted if x.split('/')[-1]!='{}.nii.gz'.format(scan_name)]
         if len(extra) == len(converted):
             if len(extra) == 2 and scan_name == 'T2':
-                to_remove.append(extra[0])
+                to_remove += extra
                 if not os.path.isfile(os.path.join(base_dir, 'T2.nii.gz')):
                     shutil.copy2(extra[1], os.path.join(base_dir, 'T2.nii.gz'))
-                converted = [os.path.join(base_dir, 'T2.nii.gz')]
+                converted_old.append(os.path.join(base_dir, 'T2.nii.gz'))
             else:
                 to_remove += extra
                 converted = None
         else:
             to_remove += extra
 
-#         if to_remove:
-#             for f in to_remove:
-#                 if os.path.isfile(f):
-#                     os.remove(f)
-
-        if scan_name != 'CT':
-            if os.path.isdir(os.path.join(base_dir, '{}'.format(scan_name))):
-                shutil.rmtree(os.path.join(base_dir, '{}'.format(scan_name)))
-
-        if converted is not None:
-            self.converted = converted[0]
+        if to_remove:
+            for f in to_remove:
+                if os.path.isfile(f):
+                    converted_old.remove(f)
+        if converted_old:
+            self.converted = converted_old[0]
             try:
                 ref = nib.load(self.converted)
                 data = ref.get_data()
                 if len(data.squeeze().shape) == 2 or len(data.squeeze().shape) > 4:
                     if os.path.isfile(self.converted):
-                        os.remove(self.converted)
+                        self.converted = None
                 elif len(data.squeeze().shape) == 4:
                     im2save = nib.Nifti1Image(data[:, :, :, 0], affine=ref.affine)
                     nib.save(im2save, self.converted)
                 elif len(data.dtype) > 0:
                     print('{} is not a greyscale image. It will be deleted.'.format(self.converted))
                     if os.path.isfile(self.converted):
-                        os.remove(self.converted)
+                        self.converted = None
             except:
                 print('{} failed to save with nibabel. It will be deleted.'.format(self.converted))
                 if os.path.isfile(self.converted):
-                    os.remove(self.converted)
-            if os.path.isfile(self.converted):
-                self.converted = self.converted
+                    self.converted = None
         else:
             self.converted = None
 
         if self.inputs.in_file and self.converted is None:
-            with open(os.path.join(base_dir, 'corrupeted_scans.txt'), 'a') as f:
-                f.write('{}'.format(scan_name))
+            outfile = self.inputs.in_file.split('.nii')[0]+'_WRONG_CONVERTION.nii.gz'
+            shutil.copy2(self.inputs.in_file, outfile)
+            self.converted = outfile
 
         return runtime
 
@@ -400,19 +384,27 @@ class CheckRTStructures(BaseInterface):
     
         rois = self.inputs.rois
         dose_nii = self.inputs.dose_file
-        if len(rois) > 1:
+        rois1 = [x for x in rois if 'gtv' in x.lower()]
+        if not rois1:
+            rois1 = [x for x in rois if 'ptv' in x.lower()]
+        if not rois1:
+            rois1 = [x for x in rois if 'ctv' in x.lower()]
+        if not rois:
+            raise Exception('No GTV, PTV or CTV found in the rois! Please check')
+
+        if len(rois1) > 1:
             roi_dict = {}
             dose = nib.load(dose_nii).get_data()
             dose_vector = dose[dose > 0]
             dose_maxvalue = np.percentile(dose_vector, 99)
-            ref_roi = nib.load(rois[0]).get_data()
+            ref_roi = nib.load(rois1[0]).get_data()
             if dose.shape != ref_roi.shape:
                 dose = resize(dose, ref_roi.shape, order=0, mode='edge',
                                    cval=0, anti_aliasing=False)
 
             dose_bool = dose >= dose_maxvalue
             
-            for f in rois:
+            for f in rois1:
                 roi = nib.load(f).get_data()
                 roi_bool = roi > 0
                 nr_andvoxel = np.logical_and(dose_bool, roi_bool)
@@ -421,11 +413,65 @@ class CheckRTStructures(BaseInterface):
             for key in roi_dict.keys():
                 if key == roi_tokeep:
                     self.checked_roi = key
+        elif len(rois1) == 1:
+            self.checked_roi = rois1[0]
 
         return runtime
     
     def _list_outputs(self):
         outputs = self._outputs().get()
         outputs['checked_roi'] = self.checked_roi
+
+        return outputs
+
+
+class GetRefRTDoseInputSpec(BaseInterfaceInputSpec):
+    
+    doses = InputMultiPath(Directory(exists=True), desc='RT doses to check')
+
+
+class GetRefRTDoseOutputSpec(TraitedSpec):
+    
+    dose_file = File(exists=True, desc='Dose file to be converted.')
+
+
+class GetRefRTDose(BaseInterface):
+    
+    input_spec = GetRefRTDoseInputSpec
+    output_spec = GetRefRTDoseOutputSpec
+
+    def _run_interface(self, runtime):
+    
+        doses = self.inputs.doses
+        phys = [x for x in doses if 'PHYS' in x]
+        rbe = [x for x in doses if 'PHYS' in x]
+        if phys:
+            dcms = glob.glob(phys[0]+'/*.dcm')
+        elif rbe:
+            dcms = glob.glob(rbe[0]+'/*.dcm')
+        elif doses: 
+            dcms = [x for y in doses for x in glob.glob(y+'/*.dcm')]
+
+        if dcms and len(dcms)==1: 
+            dose_file = dcms[0]
+        elif dcms and len(dcms) > 1: 
+            print('More than one dose file') 
+            processed = False 
+            for dcm in dcms: 
+                hd = pydicom.read_file(dcm) 
+                dose_tp = hd.DoseSummationType 
+                if not 'BEAM' in dose_tp and not processed: 
+                    dose_file = dcm
+                    processed = True 
+                    break 
+            if not processed:
+                print('No PLAN in any dose file')
+                dose_file = dcms[0]
+        self.dose_file = dose_file
+        return runtime
+    
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['dose_file'] = self.dose_file
 
         return outputs

@@ -10,7 +10,7 @@ POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair']
 
 
 def create_datasource(base_dir, sub_id, sessions, field_template,
-                      template_args, outfields, rt_session):
+                      template_args, outfields, rt):
     
     datasource = nipype.Node(
         interface=nipype.DataGrabber(
@@ -27,7 +27,8 @@ def create_datasource(base_dir, sub_id, sessions, field_template,
     datasource.inputs.sessions = sessions
     datasource.inputs.ref_ct = 'REF'
     datasource.inputs.ref_t1 = 'T10'
-    datasource.inputs.rt = rt_session
+    if rt is not None:
+        datasource.inputs.rt = rt['session']
     
     return datasource
 
@@ -60,8 +61,59 @@ def define_datasource_inputs(sequences, ref_sequence, t10, reference, rt):
 
     return field_template, template_args, outfields
 
+
+def define_datasource_inputs_dcm(sequences, ref_sequence, t10,
+                                 reference, rt, ext, process_rt=True):
+
+    field_template = dict()
+    template_args = dict()
+    outfields = ref_sequence+sequences
+    for seq in ref_sequence+sequences:
+        field_template[seq] = '%s/%s/{0}{1}'.format(seq.upper(), ext)
+        template_args[seq] = [['sub_id', 'sessions']]
+
+    if t10:
+        field_template['t1_0'] = '%s/%s/T1{0}'.format(ext)
+        template_args['t1_0'] = [['sub_id', 'ref_t1']]
+        outfields.append('t1_0')
+    if reference:
+        field_template['reference'] = '%s/%s/CT{0}'.format(ext)
+        template_args['reference'] = [['sub_id', 'ref_ct']]
+        outfields.append('reference')
+    if rt and process_rt:
+        physical = rt['physical']
+        rbe = rt['rbe']
+        doses = rt['doses']
+        rtstruct = rt['rtstruct']
+        field_template['rt'] = '%s/%s'
+        template_args['rt'] = [['sub_id', 'rt']]
+        outfields.append('rt')
+        if physical:
+            field_template['physical'] = '%s/%s/RTDOSE/1-PHY*'
+            template_args['physical'] = [['sub_id', 'rt']]
+            outfields.append('physical')
+        if rbe:
+            field_template['rbe'] = '%s/%s/RTDOSE/1-RBE*'
+            template_args['rbe'] = [['sub_id', 'rt']]
+            outfields.append('rbe')
+        if doses:
+            field_template['doses'] = '%s/%s/RTDOSE/*'
+            template_args['doses'] = [['sub_id', 'rt']]
+            outfields.append('doses')
+        if rtstruct:
+            field_template['rtstruct'] = '%s/%s/RTSTRUCT/1-*'
+            template_args['rtstruct'] = [['sub_id', 'rt']]
+            outfields.append('rtstruct')
+    elif rt and not process_rt:
+        field_template['rt'] = '%s/%s'
+        template_args['rt'] = [['sub_id', 'rt']]
+        outfields.append('rt')
+
+    return field_template, template_args, outfields
+
     
-def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
+def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None,
+                    process_rt=False):
         
     sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                 if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
@@ -76,6 +128,14 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
         sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
                               for y in os.listdir(os.path.join(base_dir, sub_id, x))
                               if y.endswith('.nii.gz')]))
+        if not sequences:
+            sequences = list(set([y.lower() for x in sessions
+                              for y in os.listdir(os.path.join(base_dir, sub_id, x))
+                              if os.path.isdir(os.path.join(base_dir, sub_id, x, y))]))
+            use_dcm = True
+            ext = ''
+        else:
+            ext = '.nii.gz'
         sequences = [x for x in sequences if x in POSSIBLE_SEQUENCES]
         if 't1' in sequences:
             ref_sequence = 't1'
@@ -97,25 +157,44 @@ def base_datasource(sub_id, base_dir, sequences=None, ref_sequence=None):
         t10 = True
     else:
         t10 = False
-    
-    if rt_session:
-        rt = True
-    else:
-        rt = False
 
-    field_template, template_args, outfields = define_datasource_inputs(
-        sequences, [ref_sequence], t10, reference, rt)
+    rt = {}
+    if rt_session:
+        physical = [x for x in os.listdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTDOSE'))
+                    if '1-PHY' in x]
+        rbe = [x for x in os.listdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTDOSE'))
+               if '1-RBE' in x]
+        if not physical and not rbe:
+            doses = [x for x in os.listdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTDOSE'))]
+        else:
+            doses = []
+        rtstruct = [x for x in os.listdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTSTRUCT'))
+                    if '1-' in x]
+        rt['physical'] = physical
+        rt['rbe'] = rbe
+        rt['doses'] = doses
+        rt['rtstruct'] = rtstruct
+        rt['session'] = rt_session[0]
+    else:
+        rt = None
+
+    if use_dcm:
+        field_template, template_args, outfields = define_datasource_inputs_dcm(
+            sequences, [ref_sequence], t10, reference, rt, ext, process_rt=process_rt)
+    else:
+        field_template, template_args, outfields = define_datasource_inputs(
+            sequences, [ref_sequence], t10, reference, rt)
 
     datasource = create_datasource(base_dir, sub_id, sessions,
                                    field_template, template_args, outfields,
-                                   rt_session[0])
+                                   rt)
     
-    return datasource, sessions, reference, t10, sequences, ref_sequence
+    return datasource, sessions, reference, t10, sequences, ref_sequence, rt
 
 
 def registration_datasource(sub_id, base_dir, xnat_source=False):
 
-    base_ds, sessions, reference, t10, sequences, ref_sequence = base_datasource(sub_id, base_dir)
+    base_ds, sessions, reference, t10, sequences, ref_sequence, rt = base_datasource(sub_id, base_dir)
     field_template = dict()
     template_args = dict()
 
@@ -141,14 +220,14 @@ def registration_datasource(sub_id, base_dir, xnat_source=False):
     else:
         xnat_scan_ids = []
     datasource = create_datasource(base_dir, sub_id, sessions,field_template,
-                                   template_args, outfields)
+                                   template_args, outfields, rt)
     
     return datasource, sessions, reference, t10, sequences, ref_sequence, xnat_scan_ids
 
 
 def segmentation_datasource(sub_id, base_dir, apply_transform=False, xnat_source=False):
 
-    base_ds, sessions, reference, t10, sequences, ref_sequence = base_datasource(sub_id, base_dir)
+    base_ds, sessions, reference, t10, sequences, ref_sequence, rt = base_datasource(sub_id, base_dir)
     field_template = dict()
     template_args = dict()
 
@@ -173,15 +252,14 @@ def segmentation_datasource(sub_id, base_dir, apply_transform=False, xnat_source
     else:
         xnat_scan_ids = []
     datasource = create_datasource(base_dir, sub_id, sessions,field_template,
-                                   template_args, outfields)
+                                   template_args, outfields, rt)
     
     return datasource, sessions, reference, t10, sequences, ref_sequence, xnat_scan_ids
 
 
 def datasink_base(datasink, datasource, workflow, sessions, reference,
-                  extra_nodes=[], t10=True, sequences=[], ref_sequence=[]):
+                  t10=True):
 
-#     sequences1 = ref_sequence+sequences+extra_nodes
     sequences1 = [x for x in datasource.inputs.field_template.keys()
                   if x!='t1_0' and x!='reference' and x!='rt']
     rt = [x for x in datasource.inputs.field_template.keys()
