@@ -271,8 +271,8 @@ class ConversionCheck(BaseInterface):
             self.converted = None
 
         if self.inputs.in_file and self.converted is None:
-            outfile = self.inputs.in_file.split('.nii')[0]+'_WRONG_CONVERTION.nii.gz'
-            shutil.copy2(self.inputs.in_file, outfile)
+            outfile = self.inputs.in_file[0].split('.nii')[0]+'_WRONG_CONVERTION.nii.gz'
+            shutil.copy2(self.inputs.in_file[0], outfile)
             self.converted = outfile
 
         return runtime
