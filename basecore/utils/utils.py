@@ -1,6 +1,7 @@
 import argparse
 import getpass
 import os
+import pydicom
 
 
 class Password(argparse.Action):
@@ -23,3 +24,17 @@ def check_already_downloaded(sessions, xnat_scans, sub_id, base_dir):
             skip_sessions.append(session)
     
     return skip_sessions
+
+
+def check_dcm_dose(dcms):
+
+    right_dcm = []
+    for dcm in dcms:
+        hd = pydicom.read_file(dcm)
+        try:
+            hd.GridFrameOffsetVector
+            hd.pixel_array
+            right_dcm.append(dcm)
+        except:
+            continue
+    return right_dcm

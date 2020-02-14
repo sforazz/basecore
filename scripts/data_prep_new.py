@@ -1,9 +1,8 @@
 "Script to run the data curation for any study"
 import os
 import argparse
-import shutil
-from basecore.workflows.datahandler import base_datasource
-from basecore.workflows.curation import convertion
+from basecore.database.base import get_subject_list
+from basecore.workflows.curation import DataCuration
 
 
 if __name__ == "__main__":
@@ -18,41 +17,46 @@ if __name__ == "__main__":
                         help=('Number of cores to use to run the registration workflow '
                               'in parallel. Default is 0, which means the workflow '
                               'will run linearly.'))
-    PARSER.add_argument('--clean-cache', '-c', action='store_true',
-                        help=('To remove all the intermediate files. Enable this only '
-                              'when you are sure that the workflow is running properly '
-                              'otherwise it will always restart from scratch. '
-                              'Default False.'))
+    PARSER.add_argument('--xnat-sink', '-xs', action='store_true',
+                        help=('Whether or not to upload the processed files to XNAT. '
+                              'Default is False'))
+    PARSER.add_argument('--xnat-source', action='store_true',
+                        help=('Whether or not to source data from XNAT. '
+                              'Default is False'))
+    PARSER.add_argument('--xnat-project-id', '-xpid', type=str,
+                        help=('XNAT project ID. If not provided, and xnat-source and/or '
+                              'xnat-sink were selected, you will be prompted to enter it.'))
+    PARSER.add_argument('--xnat-overwrite', action='store_true',
+                        help=('Whether or not to delete existing subject on XNAT, if xnat-sink'
+                              ' is selected. Default is False'))
+    PARSER.add_argument('--xnat-processed-session', action='store_false',
+                        help=('Whether or not download/upload data from/to a "processed" '
+                              'session (i.e. "_processed" is in the name of the sessions).'
+                              ' This should be false only if you work with DICOM RAW data, '
+                              'otherwise True. Default is True.'))
 
     ARGS = PARSER.parse_args()
 
     BASE_DIR = ARGS.input_dir
-    WORKFLOW_CACHE = os.path.join(ARGS.work_dir, 'temp_dir')
-    NIPYPE_CACHE_BASE = os.path.join(ARGS.work_dir, 'nipype_cache')
-    RESULT_DIR = os.path.join(ARGS.work_dir, 'data_curated')
-    CLEAN_CACHE = ARGS.clean_cache
-    CORES = ARGS.num_cores
 
-    
-    sub_list = os.listdir(BASE_DIR)
+    if (os.path.isdir(BASE_DIR) and ARGS.xnat_source) or os.path.isdir(BASE_DIR):
+        sub_list = os.listdir(BASE_DIR)
+    elif ARGS.xnat_source and not os.path.isdir(BASE_DIR):
+        BASE_DIR = os.path.join(BASE_DIR, 'xnat_cache')
+        sub_list = get_subject_list(
+            ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
+            url=ARGS.xnat_url)
 
     for sub_id in sub_list:
-        NIPYPE_CACHE = os.path.join(NIPYPE_CACHE_BASE, sub_id)
-        datasource, sessions, reference, t10, sequences, ref_sequence, rt_data = base_datasource(
-            sub_id, BASE_DIR, process_rt=True)
-        workflow = convertion(sub_id, datasource, sessions, reference,
-                              RESULT_DIR, NIPYPE_CACHE, rt_data,
-                              t10, sequences, ref_sequence)
 
-        if CORES == 0:
-            print('The workflow will run linearly.')
-            workflow.run(plugin='Linear')
-        else:
-            print('The workflow will run in parallel using {} cores'
-                  .format(CORES))
-            workflow.run('MultiProc', plugin_args={'n_procs': CORES})
+        print('Processing subject {}'.format(sub_id))
 
-        if CLEAN_CACHE:
-            shutil.rmtree(NIPYPE_CACHE)
+        workflow = DataCuration(
+            sub_id=sub_id, input_dir=BASE_DIR, work_dir=ARGS.work_dir,
+            xnat_source=ARGS.xnat_source, xnat_project_id=ARGS.xnat_project_id,
+            xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
+            xnat_processed_session=ARGS.xnat_processed_session, process_rt=True)
+
+        workflow.runner()
 
     print('Done!')

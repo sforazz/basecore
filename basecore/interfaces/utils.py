@@ -452,6 +452,16 @@ class GetRefRTDose(BaseInterface):
         elif doses: 
             dcms = [x for y in doses for x in glob.glob(y+'/*.dcm')]
 
+        right_dcm = []
+        for dcm in dcms:
+            hd = pydicom.read_file(dcm)
+            try:
+                hd.GridFrameOffsetVector
+                right_dcm.append(dcm)
+            except:
+                continue
+
+        dcms = right_dcm[:]
         if dcms and len(dcms)==1: 
             dose_file = dcms[0]
         elif dcms and len(dcms) > 1: 

@@ -2,7 +2,7 @@
 import os
 import argparse
 from basecore.database.base import get_subject_list
-from basecore.workflows.bet import BETWorkflow
+from basecore.workflows.radiomics import RadiomicsWorkflow
 
 
 if __name__ == "__main__":
@@ -34,6 +34,7 @@ if __name__ == "__main__":
     ARGS = PARSER.parse_args()
 
     BASE_DIR = ARGS.input_dir
+    regex = regex = '.*(G|g)(T|t)(V|v).*|.*(P|p)(T|t)(V|v).*|.*(B|b)osst.*|.*(C|c)(T|t)(V|v).*'
 
     if (os.path.isdir(BASE_DIR) and ARGS.xnat_source) or os.path.isdir(BASE_DIR):
         sub_list = os.listdir(BASE_DIR)
@@ -47,7 +48,8 @@ if __name__ == "__main__":
 
         print('Processing subject {}'.format(sub_id))
 
-        workflow = BETWorkflow(
+        workflow = RadiomicsWorkflow(
+            regex=regex, roi_selection=False, process_rt=True,
             sub_id=sub_id, input_dir=BASE_DIR, work_dir=ARGS.work_dir,
             xnat_source=ARGS.xnat_source, xnat_project_id=ARGS.xnat_project_id,
             xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
