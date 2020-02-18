@@ -40,6 +40,7 @@ class BaseDataHandler():
         
         base_dir = self.base_dir
         sub_id = self.sub_id
+        sequences = []
 
         sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                     if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
@@ -47,19 +48,30 @@ class BaseDataHandler():
                        if x == 'REF' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
         t10_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                        if x == 'T10' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
-        rt_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
+        rt_sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                        if 'RT_' in x and os.path.isdir(os.path.join(base_dir, sub_id, x))]
 
-        sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
-                              for y in os.listdir(os.path.join(base_dir, sub_id, x))
-                              if y.endswith('.nii.gz')]))
-        if not sequences:
-            sequences = list(set([y.lower() for x in sessions
-                              for y in os.listdir(os.path.join(base_dir, sub_id, x))
-                              if os.path.isdir(os.path.join(base_dir, sub_id, x, y))]))
-            ext = ''
+#         if sessions and not rt_session and self.process_rt:
+#             sessions_wrt = [x for x in sessions for y in os.listdir(os.path.join(base_dir, sub_id, x))
+#                             if 'RTDOSE' in y or 'RTCT' in y or 'RTSTRUCT' in y]
+#             if sorted(sessions) == sorted(list(set(sessions_wrt))):
+#                 rt_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
+#                               if 'REF' not in x and 'T10' not in x and 'RT_' not in x]
+#                 sessions = []
+#                 sequences = ['rtct']
+        if sessions:
+            sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
+                                  for y in os.listdir(os.path.join(base_dir, sub_id, x))
+                                  if y.endswith('.nii.gz')]))
+            if not sequences:
+                sequences = list(set([y.lower() for x in sessions
+                                  for y in os.listdir(os.path.join(base_dir, sub_id, x))
+                                  if os.path.isdir(os.path.join(base_dir, sub_id, x, y))]))
+                ext = ''
+            else:
+                ext = '.nii.gz'
         else:
-            ext = '.nii.gz'
+            ext = ''
         sequences = [x for x in sequences if x in POSSIBLE_SEQUENCES]
         if 't1' in sequences:
             ref_sequence = 't1'
@@ -68,7 +80,7 @@ class BaseDataHandler():
         elif 't1km' in sequences:
             ref_sequence = 't1km'
         elif ext == '':
-            ref_sequence = ''
+            ref_sequence = []
         else:
             raise Exception('Nor T1 neither T1KM were found in {}. You need at least one of them '
                             'in order to perform registration.'.format(sub_id))
@@ -86,47 +98,55 @@ class BaseDataHandler():
             t10 = False
     
         rt = {}
-        if rt_session and self.process_rt:
+        rt_sessions = sessions[:]
+        if rt_sessions and self.process_rt:
             rt['physical'] = []
             rt['rbe'] = []
             rt['doses'] = []
             rt['rtstruct'] = []
-            if os.path.isdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTDOSE')):
-                physical = [x for x in os.listdir(os.path.join(
-                    base_dir, sub_id, rt_session[0], 'RTDOSE')) if '1-PHY' in x]
-                if physical:
-                    dcms = [x for y in physical for x in glob.glob(os.path.join(
-                            base_dir, sub_id, rt_session[0], 'RTDOSE', y, '*.dcm'))]
-                    right_dcm = check_dcm_dose(dcms)
-                    if not right_dcm:
-                        physical = []
-                rbe = [x for x in os.listdir(os.path.join(
-                    base_dir, sub_id, rt_session[0], 'RTDOSE')) if '1-RBE' in x]
-                if rbe:
-                    dcms = [x for y in rbe for x in glob.glob(os.path.join(
-                            base_dir, sub_id, rt_session[0], 'RTDOSE', y, '*.dcm'))]
-                    right_dcm = check_dcm_dose(dcms)
-                    if not right_dcm:
-                        rbe = []
-                if not physical and not rbe:
-                    doses = [x for x in os.listdir(os.path.join(
-                        base_dir, sub_id, rt_session[0], 'RTDOSE'))]
-                    if doses:
-                        dcms = [x for y in doses for x in glob.glob(os.path.join(
-                            base_dir, sub_id, rt_session[0], 'RTDOSE', y, '*.dcm'))]
+            rt['rtct'] = []
+            rt['session'] = []
+            for rt_session in rt_sessions:
+                if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTDOSE')):
+                    physical = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTDOSE')) if '1-PHY' in x]
+                    if physical:
+                        dcms = [x for y in physical for x in glob.glob(os.path.join(
+                                base_dir, sub_id, rt_session, 'RTDOSE', y, '*.dcm'))]
                         right_dcm = check_dcm_dose(dcms)
                         if not right_dcm:
-                            doses = []
-                else:
-                    doses = []
-                rt['physical'] = physical
-                rt['rbe'] = rbe
-                rt['doses'] = doses
-            if os.path.isdir(os.path.join(base_dir, sub_id, rt_session[0], 'RTSTRUCT')):
-                rtstruct = [x for x in os.listdir(os.path.join(
-                    base_dir, sub_id, rt_session[0], 'RTSTRUCT')) if '1-' in x]
-                rt['rtstruct'] = rtstruct
-            rt['session'] = rt_session[0]
+                            physical = []
+                    rbe = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTDOSE')) if '1-RBE' in x]
+                    if rbe:
+                        dcms = [x for y in rbe for x in glob.glob(os.path.join(
+                                base_dir, sub_id, rt_session, 'RTDOSE', y, '*.dcm'))]
+                        right_dcm = check_dcm_dose(dcms)
+                        if not right_dcm:
+                            rbe = []
+                    if not physical and not rbe:
+                        doses = [x for x in os.listdir(os.path.join(
+                            base_dir, sub_id, rt_session, 'RTDOSE'))]
+                        if doses:
+                            dcms = [x for y in doses for x in glob.glob(os.path.join(
+                                base_dir, sub_id, rt_session, 'RTDOSE', y, '*.dcm'))]
+                            right_dcm = check_dcm_dose(dcms)
+                            if not right_dcm:
+                                doses = []
+                    else:
+                        doses = []
+                    rt['physical'] = rt['physical']+physical
+                    rt['rbe'] = rt['rbe'] + rbe
+                    rt['doses'] = rt['doses'] + doses
+                if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTSTRUCT')):
+                    rtstruct = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTSTRUCT')) if '1-' in x]
+                    rt['rtstruct'] = rt['rtstruct'] + rtstruct
+                if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTCT')):
+                    rtct = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTCT')) if '1-' in x]
+                    rt['rtct'] = rt['rtct'] + rtct
+                rt['session'].append(rt_session)
         else:
             rt = None
 
@@ -147,7 +167,10 @@ class BaseDataHandler():
     def define_datasource_inputs(self):
     
         sequences = self.sequences
-        ref_sequence = [self.ref_sequence]
+        if type(self.ref_sequence) == list:
+            ref_sequence = self.ref_sequence
+        else:
+            ref_sequence = [self.ref_sequence]
         t10 = self.t10
         reference = self.reference
         rt = self.rt
@@ -160,7 +183,6 @@ class BaseDataHandler():
         for seq in ref_sequence+sequences:
             field_template[seq] = '%s/%s/{0}{1}'.format(seq.upper(), ext)
             template_args[seq] = [['sub_id', 'sessions']]
-    
         if t10:
             field_template['t1_0'] = '%s/%s/T1{0}'.format(ext)
             template_args['t1_0'] = [['sub_id', 'ref_t1']]
@@ -174,6 +196,7 @@ class BaseDataHandler():
             rbe = rt['rbe']
             doses = rt['doses']
             rtstruct = rt['rtstruct']
+            rtct = rt['rtct']
             field_template['rt'] = '%s/%s'
             template_args['rt'] = [['sub_id', 'rt']]
             outfields.append('rt')
@@ -193,6 +216,10 @@ class BaseDataHandler():
                 field_template['rtstruct'] = '%s/%s/RTSTRUCT/1-*'
                 template_args['rtstruct'] = [['sub_id', 'rt']]
                 outfields.append('rtstruct')
+            if rtct:
+                field_template['rtct'] = '%s/%s/RTCT/1-*'
+                template_args['rtct'] = [['sub_id', 'rt']]
+                outfields.append('rtct')
         elif rt and not process_rt:
             field_template['rt'] = '%s/%s'
             template_args['rt'] = [['sub_id', 'rt']]
