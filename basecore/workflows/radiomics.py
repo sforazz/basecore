@@ -38,6 +38,9 @@ class RadiomicsWorkflow(BaseWorkflow):
 
         field_template['rt_dose'] = '%s/%s/{}'.format(rt_dose)
         template_args['rt_dose'] = [['sub_id', 'rt']]
+
+        field_template['rtct_nifti'] = '%s/%s/RTCT.nii.gz'
+        template_args['rtct_nifti'] = [['sub_id', 'rt']]
         
         field_template['rts_dcm'] = '%s/%s/RTSTRUCT_used/*dcm'
         template_args['rts_dcm'] = [['sub_id', 'rt']]
@@ -70,7 +73,7 @@ class RadiomicsWorkflow(BaseWorkflow):
     
         datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
         substitutions = [('subid', sub_id)]
-        substitutions += [('RTsession', self.rt['session'])]
+#         substitutions += [('RTsession', self.rt['session'])]
         substitutions += [('results/', '{}/'.format(self.workflow_name))]
     
         voxelizer = nipype.MapNode(interface=Voxelizer(),
@@ -88,17 +91,21 @@ class RadiomicsWorkflow(BaseWorkflow):
             workflow.connect(voxelizer, 'out_files', select, 'rois')
             workflow.connect(datasource, 'rt_dose', select, 'dose_file')
             workflow.connect(select, 'checked_roi', datasink,
-                             'results.subid.RTsession.@masks')
+                             'results.subid.@masks')
         else:
             workflow.connect(voxelizer, 'out_files', datasink,
-                             'results.subid.RTsession.@masks')
+                             'results.subid.@masks')
         
 #         for i, session in enumerate(sessions):
-        substitutions += [('_select_gtv0/', '/')]
-        substitutions += [('_voxelizer0/', '/')]
+        for i, session in enumerate(self.rt['session']):
+            substitutions += [(('_select_gtv{}/'.format(i), session+'/'))]
+            substitutions += [(('_voxelizer{}/'.format(i), session+'/'))]
+#         substitutions += [('_select_gtv0/', '/')]
+#         substitutions += [('_voxelizer0/', '/')]
         datasink.inputs.substitutions =substitutions
     
-        workflow.connect(datasource, 'reference', voxelizer, 'reference')
+        workflow.connect(datasource, 'rtct_nifti', voxelizer, 'reference')
+#         workflow.connect(datasource, 'reference', voxelizer, 'reference')
         workflow.connect(datasource, 'rts_dcm', voxelizer, 'struct_file')
 
         workflow = self.datasink(workflow, datasink)

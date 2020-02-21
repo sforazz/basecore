@@ -4,14 +4,14 @@ import re
 import os
 import glob
 import getpass
-from .base import get_resource_name
+from .utils import get_resource_name
 from basecore.utils.filemanip import split_filename
 import json
 
 
 session_modality_re = re.compile(r'(MR|CT|RT)(\d+|\w+)')
 
-class Pyxnat():
+class PyxnatDatabase():
     
     def __init__(self, xnat_config, xnat_url = 'https://central.xnat.org',
                  project_id=None, processed_session=True, overwrite=False):
@@ -234,3 +234,13 @@ class Pyxnat():
             with open(cache_dir+'/failed_download.txt', 'w') as f:
                 for line in failed:
                     f.write(line+'\n')
+
+    def get_subject_list(self):
+
+        interface = self.interface
+    
+        xnat_subjects = interface.select.project(self.project_id).subjects().get()
+        xnat_sub_labels = [interface.select.project(self.project_id).subject(x).label()
+                           for x in xnat_subjects]
+
+        return xnat_sub_labels

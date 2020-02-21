@@ -49,7 +49,7 @@ class RTDataSorting(BaseInterface):
                                     for r in modality_list if r in y]))
         for tp_folder in input_tp_folder:
             sub_name, tp = tp_folder.split('/')[-2:]
-            out_basedir = os.path.join(out_dir, sub_name, tp)
+            out_basedir = os.path.join(out_dir, sub_name, 'RT_'+tp)
             print('Processing Sub: {0}, timepoint: {1}'.format(sub_name, tp))
 
             plan_name, rtstruct_instance, dose_cubes_instance = self.extract_plan(

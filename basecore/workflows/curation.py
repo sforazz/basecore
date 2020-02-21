@@ -1,13 +1,36 @@
-from basecore.interfaces.utils import DicomCheck, ConversionCheck, GetRefRTDose
 import nipype
+import os
+from basecore.interfaces.utils import DicomCheck, ConversionCheck, GetRefRTDose
 from nipype.interfaces.dcm2nii import Dcm2niix
 from basecore.interfaces.plastimatch import DoseConverter
 from basecore.workflows.base import BaseWorkflow
+from basecore.interfaces.utils import FolderPreparation, FolderSorting
+from basecore.interfaces.custom import RTDataSorting
 
 
 class DataCuration(BaseWorkflow):
+    
+    def sorting_workflow(self):
 
-    def workflow(self):
+        nipype_cache = os.path.join(self.nipype_cache, 'data_sorting')
+        result_dir = self.result_dir
+
+        workflow = nipype.Workflow('sorting_workflow', base_dir=nipype_cache)
+        datasink = nipype.Node(nipype.DataSink(base_directory=result_dir),
+                               "datasink")
+
+        prep = nipype.Node(interface=FolderPreparation(), name='prep')
+        prep.inputs.input_dir = self.base_dir
+        sort = nipype.Node(interface=FolderSorting(), name='sort')
+        rt_sorting = nipype.Node(interface=RTDataSorting(), name='rt_sorting')
+        
+        workflow.connect(prep, 'out_folder', sort, 'input_dir')
+        workflow.connect(sort, 'out_folder', rt_sorting, 'input_dir')
+        workflow.connect(rt_sorting, 'out_folder', datasink, '@rt_sorted')
+        
+        return workflow
+
+    def convertion_workflow(self):
         
         self.datasource()
 
@@ -21,7 +44,8 @@ class DataCuration(BaseWorkflow):
         sequences = self.sequences
         reference = self.reference
         rt_data = self.rt
-        rt_session = self.rt['session']
+        if rt_data is not None:
+            rt_session = rt_data['session']
 
         workflow = nipype.Workflow('data_convertion_workflow', base_dir=nipype_cache)
     
@@ -33,13 +57,7 @@ class DataCuration(BaseWorkflow):
         else:
             to_convert = sequences+[ref_sequence]
         if rt_data is not None:
-    
             rt_sequences = [x for x in rt_data.keys() if rt_data[x] and x != 'session']
-#             substitutions += [('RTsession', rt_data['session'])]
-#             substitutions += [('_converterdoses0/', '')]
-#             substitutions += [('_converterphysical0/', '')]
-#             substitutions += [('_converterrbe0/', '')]
-#             substitutions += [('RTSTRUCT_used/checked_dicoms', 'RTSTRUCT_used/')]
             workflow.connect(datasource, 'rt', datasink, 'results.subid.@rt')  
             to_convert = to_convert + rt_sequences
         else:
@@ -138,7 +156,7 @@ class DataCuration(BaseWorkflow):
                     workflow.connect(datasource, seq, dc, 'dicom_dir')
                     workflow.connect(dc, 'outdir', datasink,
                                      'results.subid.@rtstruct')
-                    for i, session in enumerate(sessions):
+                    for i, session in enumerate(rt_session):
                         substitutions += [(('_dc{0}{1}/checked_dicoms'.format(seq, i),
                                             session+'/RTSTRUCT_used'))]
                 for i, session in enumerate(rt_session):
@@ -150,3 +168,26 @@ class DataCuration(BaseWorkflow):
         datasink.inputs.substitutions =substitutions
     
         return workflow
+
+    def workflow_setup(self, data_sorting=False):
+
+        if data_sorting:
+            sorting_workflow = self.sorting_workflow()
+            sorting_workflow.run()
+        else:
+            workflow = self.convertion_workflow()
+
+        return workflow
+
+#     def runner(self, data_sorting=False):
+# 
+#         if data_sorting:
+#             sorting_workflow = self.sorting_workflow()
+#             sorting_workflow.run()
+#         else:
+#             workflow = self.convertion_workflow()
+#             workflow.run()
+#             if self.cluster_sink:
+#                 self.cluster_datasink()
+#             if self.xnat_sink:
+#                 self.xnat_datasink()

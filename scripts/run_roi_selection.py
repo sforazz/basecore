@@ -1,59 +1,56 @@
 "Script to run brain extraction using HD-BET"
-import os
-import argparse
-from basecore.database.base import get_subject_list
+from basecore.utils.utils import check_rtstruct
 from basecore.workflows.radiomics import RadiomicsWorkflow
+from basecore.utils.config import cmdline_input_config, create_subject_list
 
 
 if __name__ == "__main__":
 
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument('--input_dir', '-i', type=str,
-                        help=('Exisisting directory with the subject(s) to process'))
-    PARSER.add_argument('--work_dir', '-w', type=str,
-                        help=('Directory where to store the results.'))
-    PARSER.add_argument('--xnat-sink', '-xs', action='store_true',
-                        help=('Whether or not to upload the processed files to XNAT. '
+    PARSER = cmdline_input_config()
+    
+    PARSER.add_argument('--roi-selection', '-rs', action='store_true',
+                        help=('Whether or not to select the ROI in the RT structure set'
+                              'with the highest overlap with the dose distribution. '
                               'Default is False'))
-    PARSER.add_argument('--xnat-source', action='store_true',
-                        help=('Whether or not to source data from XNAT. '
-                              'Default is False'))
-    PARSER.add_argument('--xnat-project-id', '-xpid', type=str,
-                        help=('XNAT project ID. If not provided, and xnat-source and/or '
-                              'xnat-sink were selected, you will be prompted to enter it.'))
-    PARSER.add_argument('--xnat-overwrite', action='store_true',
-                        help=('Whether or not to delete existing subject on XNAT, if xnat-sink'
-                              ' is selected. Default is False'))
-    PARSER.add_argument('--xnat-processed-session', action='store_false',
-                        help=('Whether or not download/upload data from/to a "processed" '
-                              'session (i.e. "_processed" is in the name of the sessions).'
-                              ' This should be false only if you work with DICOM RAW data, '
-                              'otherwise True. Default is True.'))
+    PARSER.add_argument('--check-rts', action='store_false',
+                        help=('Whether or not to check all the RTSTRUCT sets in the input '
+                              ' directory to make sure that they contain at least one match'
+                              ' for the provided regex. Default is True.'))
+    PARSER.add_argument('--regular-expression', '-regex', type=str, default='',
+                        help=('Regular expression to be used to extract the corresponding'
+                              ' ROIs from the RT structure set. By default it will '
+                              'extract any ROI containing GTV, PTV, CTV and Boost '
+                              'in the name.'))
 
     ARGS = PARSER.parse_args()
 
     BASE_DIR = ARGS.input_dir
-    regex = regex = '.*(G|g)(T|t)(V|v).*|.*(P|p)(T|t)(V|v).*|.*(B|b)osst.*|.*(C|c)(T|t)(V|v).*'
+    if not ARGS.regular_expression:
+        regex = '.*(G|g)(T|t)(V|v).*|.*(P|p)(T|t)(V|v).*|.*(B|b)osst.*|.*(C|c)(T|t)(V|v).*'
+    else:
+        regex = ARGS.regular_expression
+    
+    if ARGS.check_rts:
+        subjecs_to_process = check_rtstruct(BASE_DIR, regex)
+    else:
+        subjecs_to_process = []
 
-    if (os.path.isdir(BASE_DIR) and ARGS.xnat_source) or os.path.isdir(BASE_DIR):
-        sub_list = os.listdir(BASE_DIR)
-    elif ARGS.xnat_source and not os.path.isdir(BASE_DIR):
-        BASE_DIR = os.path.join(BASE_DIR, 'xnat_cache')
-        sub_list = get_subject_list(
-            ARGS.xnat_pid, user=ARGS.xnat_user, pwd=ARGS.xnat_pwd,
-            url=ARGS.xnat_url)
+    sub_list, BASE_DIR = create_subject_list(BASE_DIR, ARGS.xnat_source,
+                                             ARGS.cluster_source,
+                                             subjects_to_process=subjecs_to_process)
 
     for sub_id in sub_list:
 
         print('Processing subject {}'.format(sub_id))
 
         workflow = RadiomicsWorkflow(
-            regex=regex, roi_selection=False, process_rt=True,
+            regex=regex, roi_selection=ARGS.roi_selection,
             sub_id=sub_id, input_dir=BASE_DIR, work_dir=ARGS.work_dir,
             xnat_source=ARGS.xnat_source, xnat_project_id=ARGS.xnat_project_id,
             xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
-            xnat_processed_session=ARGS.xnat_processed_session)
+            xnat_processed_session=ARGS.xnat_processed_session, process_rt=True,
+            cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
+            cluster_project_id=ARGS.cluster_project_id)
 
         workflow.runner()
 

@@ -66,7 +66,7 @@ class RegistrationWorkflow(BaseWorkflow):
             outname_T12CT = 'T1_ref_reg2CT'
         else:
             outname_reg2T1 = 'reg2CT'
-            outname_T12CT = 'T1_reg2CT'
+            outname_T12CT = '{}_reg2CT'.format(ref_sequence.upper())
     
         if reference:
             regT12CT = nipype.MapNode(interface=AntsRegSyn(),
@@ -195,8 +195,10 @@ class RegistrationWorkflow(BaseWorkflow):
                                '{}.mat'.format(outname_T12CT))]
             substitutions += [('_regT12CT{}/antsregWarped.nii.gz'.format(i),
                                '{}.nii.gz'.format(outname_T12CT))]
-            substitutions += [('_apply_ts_t1{}/T1_reoriented_trans.nii.gz'.format(i),
-                               session+'/'+'T1_reg2CT.nii.gz')]
+            substitutions += [('_apply_ts_t1{0}/{1}_reoriented_trans.nii.gz'
+                               .format(i, ref_sequence.upper()),
+                               session+'/'+'{}_reg2CT.nii.gz'
+                               .format(ref_sequence.upper()))]
     
         datasink.inputs.substitutions =substitutions
         # Create Workflow

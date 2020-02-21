@@ -386,11 +386,11 @@ class CheckRTStructures(BaseInterface):
     
         rois = self.inputs.rois
         dose_nii = self.inputs.dose_file
-        rois1 = [x for x in rois if 'gtv' in x.lower()]
+        rois1 = [x for x in rois if 'gtv' in x.split('/')[-1].lower()]
         if not rois1:
-            rois1 = [x for x in rois if 'ptv' in x.lower()]
+            rois1 = [x for x in rois if 'ptv' in x.split('/')[-1].lower()]
         if not rois1:
-            rois1 = [x for x in rois if 'ctv' in x.lower()]
+            rois1 = [x for x in rois if 'ctv' in x.split('/')[-1].lower()]
         if not rois:
             raise Exception('No GTV, PTV or CTV found in the rois! Please check')
 
@@ -445,14 +445,15 @@ class GetRefRTDose(BaseInterface):
     def _run_interface(self, runtime):
     
         doses = self.inputs.doses
-        phys = [x for x in doses if 'PHYS' in x]
-        rbe = [x for x in doses if 'PHYS' in x]
+        phys = [x for y in doses for x in glob.glob(y+'/*/*.dcm') if 'PHY' in x]
+        rbe = [x for y in doses for x in glob.glob(y+'/*/*.dcm') if 'RBE' in x]
         if phys:
-            dcms = glob.glob(phys[0]+'/*.dcm')
+#             dcms = glob.glob(phys[0]+'/*.dcm')
+            dcms = phys
         elif rbe:
-            dcms = glob.glob(rbe[0]+'/*.dcm')
+            dcms = rbe
         elif doses: 
-            dcms = [x for y in doses for x in glob.glob(y+'/*.dcm')]
+            dcms = [x for y in doses for x in glob.glob(y+'/*/*.dcm')]
 
         right_dcm = []
         for dcm in dcms:
