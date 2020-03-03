@@ -335,10 +335,7 @@ class MRClassInputSpec(BaseInterfaceInputSpec):
                            desc='MR data sorted folder.')
 
 class MRClassOutputSpec(TraitedSpec):
-    
-#     labelled_images = traits.Dict(desc='Dictonary with MRClass results.')
-#     unclassifiable = traits.List(desc='List of images that could not be '
-#                                  'classified by MRClass')
+
     out_folder = Directory(help='MR Sorted folder.')
 
 
@@ -440,12 +437,12 @@ class MRClass(BaseInterface):
             if key == 'T1' or key == 'DIFF':
                 del labeled_images[key]
 #  
-        self.labelled_images = {**labeled_subImages, **labeled_images}
-        with open('/home/fsforazz/ww.pickle', 'wb') as f:
-            pickle.dump(self.labelled_images, f, protocol=pickle.HIGHEST_PROTOCOL)
-         
-        with open('/home/fsforazz/ww.pickle', 'rb') as handle:
-            self.labelled_images = pickle.load(handle)
+#         self.labelled_images = {**labeled_subImages, **labeled_images}
+#         with open('/home/fsforazz/ww.pickle', 'wb') as f:
+#             pickle.dump(self.labelled_images, f, protocol=pickle.HIGHEST_PROTOCOL)
+#          
+#         with open('/home/fsforazz/ww.pickle', 'rb') as handle:
+#             self.labelled_images = pickle.load(handle)
 
         to_remove = []
         for key in self.labelled_images.keys():
@@ -472,13 +469,6 @@ class MRClass(BaseInterface):
 
         return runtime
 
-#     def _list_outputs(self):
-#         outputs = self._outputs().get()
-#         if isdefined(self.inputs.out_folder):
-#             outputs['labelled_images'] = self.labelled_images
-#             outputs['unclassifiable'] = self.unclassifiable
-# 
-#         return outputs
     def _list_outputs(self):
         outputs = self._outputs().get()
         if isdefined(self.inputs.out_folder):

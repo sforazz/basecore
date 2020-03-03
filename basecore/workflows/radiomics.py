@@ -18,7 +18,7 @@ class RadiomicsWorkflow(BaseWorkflow):
 
         self.database()
         rt = self.rt
-
+        rt_dose = None
         if rt:
             if rt['physical']:
                 rt_dose = '*PHY*.nii.gz'
@@ -35,9 +35,9 @@ class RadiomicsWorkflow(BaseWorkflow):
         
         field_template = dict()
         template_args = dict()
-
-        field_template['rt_dose'] = '%s/%s/{}'.format(rt_dose)
-        template_args['rt_dose'] = [['sub_id', 'rt']]
+        if rt_dose is not None:
+            field_template['rt_dose'] = '%s/%s/{}'.format(rt_dose)
+            template_args['rt_dose'] = [['sub_id', 'rt']]
 
         field_template['rtct_nifti'] = '%s/%s/RTCT.nii.gz'
         template_args['rtct_nifti'] = [['sub_id', 'rt']]

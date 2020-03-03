@@ -22,7 +22,7 @@ sub_checkpoints={'T1': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoi
 
 class DataCuration(BaseWorkflow):
     
-    def sorting_workflow(self):
+    def sorting_workflow(self, subject_name_position=-3, renaming=False):
 
         nipype_cache = os.path.join(self.nipype_cache, 'data_sorting')
         result_dir = self.result_dir
@@ -37,7 +37,8 @@ class DataCuration(BaseWorkflow):
         create_list.inputs.input_dir = self.base_dir
         file_check = nipype.MapNode(interface=FileCheck(), iterfield=['input_file'],
                                     name='fc', serial=True)
-        file_check.inputs.subject_name_position = 6
+        file_check.inputs.subject_name_position = subject_name_position
+        file_check.inputs.renaming = renaming
         prep = nipype.Node(interface=FolderPreparation(), name='prep')
         sort = nipype.MapNode(interface=FolderSorting(), name='sort',
                               iterfield=['input_dir'])
@@ -209,10 +210,13 @@ class DataCuration(BaseWorkflow):
     
         return workflow
 
-    def workflow_setup(self, data_sorting=False):
+    def workflow_setup(self, data_sorting=False, subject_name_position=-3,
+                       renaming=False):
 
         if data_sorting:
-            workflow = self.sorting_workflow()
+            workflow = self.sorting_workflow(
+                subject_name_position=subject_name_position,
+                renaming=renaming)
 #             sorting_workflow.run()
         else:
             workflow = self.convertion_workflow()

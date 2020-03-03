@@ -15,6 +15,21 @@ if __name__ == "__main__":
     PARSER.add_argument('--data_sorting', '-ds', action='store_true',
                         help=('Whether or not to sort the data before convertion. '
                               'Default is False'))
+    PARSER.add_argument('--renaming', action='store_true', 
+                        help='Whether or not to use the information stored'
+                           'in the DICOM header to rename the subject and sessions '
+                           'folders. If False, the file path will be splitted '
+                           'and the subject name will be taken from there. In this '
+                           'case, the subject-name-position must be provided.'
+                           'Default is False.')
+    PARSER.add_argument('--subject-name-position', '-np', type=int, default=-3,
+                        help=('If renaming is False, the position of the subject ID '
+                              'in the image path has to be specified (assuming it will'
+                              ' be the same for all the files). For example, '
+                              'the position in the file called /mnt/sdb/tosort/sub1/'
+                              'session1/image.dcm, will be 3 (or -3, remember that in Python'
+                              'numbering starts from 0). By default, is the third'
+                              ' position starting from the end of the path.'))
 
     ARGS = PARSER.parse_args()
 
@@ -28,7 +43,9 @@ if __name__ == "__main__":
         workflow = DataCuration(
             sub_id='', input_dir=BASE_DIR, work_dir=ARGS.work_dir,
             process_rt=True)
-        wf = workflow.workflow_setup(data_sorting=True)
+        wf = workflow.workflow_setup(
+            data_sorting=True, subject_name_position=ARGS.subject_name_position,
+            renaming=ARGS.renaming)
         workflow.runner(wf, cores=ARGS.num_cores)
         BASE_DIR = os.path.join(ARGS.work_dir, 'workflows_output', 'Sorted_Data')
         sub_list = os.listdir(BASE_DIR)
