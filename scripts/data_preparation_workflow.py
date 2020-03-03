@@ -53,22 +53,24 @@ datasource_rt.inputs.sort_filelist = True
 datasource_rt.inputs.field_template = dict(directory='*/RT_*/%s')
 
 datasource_dose = nipype.Node(
-    interface=nipype.DataGrabber(infields=['name'], outfields=['directory']),
+    interface=nipype.DataGrabber(infields=['name'], outfields=['physical', 'rbe', 'doses']),
     name='datasource_dose')
 datasource_dose.inputs.base_directory = base_dir
 datasource_dose.inputs.template = '*'
 datasource_dose.inputs.sort_filelist = True
-datasource_dose.inputs.field_template = dict(directory='*/*/%s/1-PHY*')
+datasource_dose.inputs.field_template = dict(physical='*/*/%s/1-PHY*',
+                                             rbe='*/*/%s/1-RBE*',
+                                             doses='*/*/%s/*')
 datasource_dose.inputs.name = 'RTDOSE'
 
-datasource_dose_rbe = nipype.Node(
-    interface=nipype.DataGrabber(infields=['name'], outfields=['directory']),
-    name='datasource_dose_rbe')
-datasource_dose_rbe.inputs.base_directory = base_dir
-datasource_dose_rbe.inputs.template = '*'
-datasource_dose_rbe.inputs.sort_filelist = True
-datasource_dose_rbe.inputs.field_template = dict(directory='*/*/%s/1-RBE*')
-datasource_dose_rbe.inputs.name = 'RTDOSE'
+# datasource_dose_rbe = nipype.Node(
+#     interface=nipype.DataGrabber(infields=['name'], outfields=['directory']),
+#     name='datasource_dose_rbe')
+# datasource_dose_rbe.inputs.base_directory = base_dir
+# datasource_dose_rbe.inputs.template = '*'
+# datasource_dose_rbe.inputs.sort_filelist = True
+# datasource_dose_rbe.inputs.field_template = dict(directory='*/*/%s/1-RBE*')
+# datasource_dose_rbe.inputs.name = 'RTDOSE'
 
 dc_rt = nipype.MapNode(interface=DicomCheck(), iterfield=['dicom_dir'], name='dc_rt')
 dc_rt.inputs.working_dir = result_dir
@@ -86,14 +88,14 @@ dc = nipype.MapNode(interface=DicomCheck(), iterfield=['dicom_dir'], name='dc')
 dc.inputs.working_dir = result_dir
 
 converter = nipype.MapNode(interface=Dcm2niix(),
-                           iterfield=['source_dir', 'out_filename', 'output_dir'],
+                           iterfield=['source_dir', 'out_filename'],
                            name='converter')
 converter.inputs.compress = 'y'
 converter.inputs.philips_float = False
 converter.inputs.merge_imgs = False
 
 converter_ct = nipype.MapNode(interface=Dcm2niix(),
-                           iterfield=['source_dir', 'out_filename', 'output_dir'],
+                           iterfield=['source_dir', 'out_filename'],
                            name='converter_ct')
 converter_ct.inputs.compress = 'y'
 converter_ct.inputs.philips_float = False
@@ -115,6 +117,8 @@ check_ct = nipype.MapNode(interface=ConversionCheck(),
                           iterfield=['in_file', 'file_name'],
                           name='check_conversion_ct')
 
+datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
+
 workflow = nipype.Workflow('data_preparation_workflow', base_dir=cache_dir)
 workflow.connect(inputnode, 'contrasts', datasource, 'contrasts')
 workflow.connect(datasource, 'directory', dc, 'dicom_dir')
@@ -122,22 +126,23 @@ workflow.connect(inputnode_rt, 'rt_files', datasource_rt, 'rt_files')
 workflow.connect(datasource_rt, 'directory', dc_rt, 'dicom_dir')
 workflow.connect(dc, 'outdir', converter, 'source_dir')
 workflow.connect(dc, 'scan_name', converter, 'out_filename')
-workflow.connect(dc, 'base_dir', converter, 'output_dir')
+# workflow.connect(dc, 'base_dir', converter, 'output_dir')
 workflow.connect(dc, 'scan_name', check, 'file_name')
 workflow.connect(datasource_ct, 'directory', dc_ct, 'dicom_dir')
 workflow.connect(dc_ct, 'outdir', converter_ct, 'source_dir')
 workflow.connect(dc_ct, 'scan_name', converter_ct, 'out_filename')
-workflow.connect(dc_ct, 'base_dir', converter_ct, 'output_dir')
+# workflow.connect(dc_ct, 'base_dir', converter_ct, 'output_dir')
 workflow.connect(dc_ct, 'scan_name', check_ct, 'file_name')
 workflow.connect(converter_ct, 'converted_files', check_ct, 'in_file')
 workflow.connect(converter, 'converted_files', check, 'in_file')
-workflow.connect(datasource_dose, 'directory', dc_dose, 'dicom_dir')
+workflow.connect(datasource_dose, 'physical', dc_dose, 'dicom_dir')
 workflow.connect(dc_dose, 'dose_file', converter_dose, 'input_dose')
 workflow.connect(dc_dose, 'dose_output', converter_dose, 'out_name')
-workflow.connect(datasource_dose_rbe, 'directory', dc_dose_rbe, 'dicom_dir')
+workflow.connect(datasource_dose, 'rbe', dc_dose_rbe, 'dicom_dir')
 workflow.connect(dc_dose_rbe, 'dose_file', converter_dose_rbe, 'input_dose')
 workflow.connect(dc_dose_rbe, 'dose_output', converter_dose_rbe, 'out_name')
 
+workflow.connect(check, 'out_file', datasink, 'results.subid.@converted_file')
 workflow.run()
 # workflow.run('MultiProc', plugin_args={'n_procs': 8})
 

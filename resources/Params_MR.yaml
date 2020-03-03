@@ -1,0 +1,67 @@
+
+
+# #############################  Extracted using PyRadiomics version: <version>  ######################################
+
+imageType:
+  Original: {}
+  LoG:
+    sigma: [2.0, 3.0, 4.0, 5.0]
+  Wavelet: {}
+
+featureClass:
+  # redundant Compactness 1, Compactness 2 an Spherical Disproportion features are disabled by default, they can be
+  # enabled by specifying individual feature names (as is done for glcm) and including them in the list.
+  shape:
+  firstorder:
+  glcm:  # Disable SumAverage by specifying all other GLCM features available
+    - 'Autocorrelation'
+    - 'JointAverage'
+    - 'ClusterProminence'
+    - 'ClusterShade'
+    - 'ClusterTendency'
+    - 'Contrast'
+    - 'Correlation'
+    - 'DifferenceAverage'
+    - 'DifferenceEntropy'
+    - 'DifferenceVariance'
+    - 'JointEnergy'
+    - 'JointEntropy'
+    - 'Imc1'
+    - 'Imc2'
+    - 'Idm'
+    - 'Idmn'
+    - 'Id'
+    - 'Idn'
+    - 'InverseVariance'
+    - 'MaximumProbability'
+    - 'SumEntropy'
+    - 'SumSquares'
+  glrlm:
+  glszm:
+  gldm:
+
+setting:
+  # Normalization:
+
+  normalize: True
+  normalizeScale: 100  # This allows you to use more or less the same bin width.
+
+  # Resampling:
+  interpolator: 'sitkBSpline'
+  resampledPixelSpacing: [2, 2, 2]
+
+  # Mask validation:
+  #minimumROIDimensions: 2
+  #minimumROISize: 50
+
+  # Image discretization:
+  binWidth: 25
+
+  # first order specific settings:
+
+  voxelArrayShift: 300
+
+  # Misc:
+  # default label value. Labels can also be defined in the call to featureextractor.execute, as a commandline argument,
+  # or in a column "Label" in the input csv (batchprocessing)
+  label: 1
