@@ -21,6 +21,10 @@ if __name__ == "__main__":
                               ' ROIs from the RT structure set. By default it will '
                               'extract any ROI containing GTV, PTV, CTV and Boost '
                               'in the name.'))
+    PARSER.add_argument('--num-cores', '-nc', type=int, default=0,
+                        help=('Number of cores to use to run the registration workflow '
+                              'in parallel. Default is 0, which means the workflow '
+                              'will run linearly.'))
 
     ARGS = PARSER.parse_args()
 
@@ -32,6 +36,7 @@ if __name__ == "__main__":
     
     if ARGS.check_rts:
         subjecs_to_process = check_rtstruct(BASE_DIR, regex)
+        print('Number of subjects: {}'.format(len(subjecs_to_process)))
     else:
         subjecs_to_process = []
 
@@ -52,6 +57,7 @@ if __name__ == "__main__":
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
             cluster_project_id=ARGS.cluster_project_id)
 
-        workflow.runner()
+        wf = workflow.workflow_setup()
+        workflow.runner(wf, cores=ARGS.num_cores)
 
     print('Done!')

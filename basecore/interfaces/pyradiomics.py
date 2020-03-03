@@ -30,6 +30,7 @@ class FeatureExtraction(BaseInterface):
         rois = self.inputs.rois
         parameter_file = self.inputs.parameter_file
         image = self.inputs.input_image
+        image_name = image.split('/')[-1].split('.nii')[0]
         out_basename = self.inputs.outname
         self.outfiles = []
         extractor = featureextractor.RadiomicsFeatureExtractor(parameter_file)
@@ -38,7 +39,7 @@ class FeatureExtraction(BaseInterface):
             roi_name = roi.split('/')[-1].split('.nii')[0]
             keys = ['Subject', 'Mask']
             values = [image, roi]
-            outname = op.abspath(out_basename+'_'+roi_name+'.csv')
+            outname = op.abspath(out_basename+'_'+image_name+'_'+roi_name+'.csv')
             result = extractor.execute(image, roi)
             
             for k, value in result.items():

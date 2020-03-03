@@ -2,7 +2,8 @@ import os.path as op
 import glob
 from nipype.interfaces.base import (
     TraitedSpec, traits, File, CommandLineInputSpec, CommandLine)
-from nipype.interfaces.base.traits_extension import InputMultiPath
+from nipype.interfaces.base.traits_extension import InputMultiPath,\
+    OutputMultiPath
 
 
 class CLGlobalFeaturesInputSpec(CommandLineInputSpec):
@@ -98,7 +99,7 @@ class VoxelizerInputSpec(CommandLineInputSpec):
 
 class VoxelizerOutputSpec(TraitedSpec):
 
-    out_files = InputMultiPath(File(exists=True))
+    out_files = OutputMultiPath(File(exists=True))
 
 
 class Voxelizer(CommandLine):

@@ -62,6 +62,9 @@ class BaseDatabase():
                        if x == 'T10' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
         rt_sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                        if 'RT_' in x and os.path.isdir(os.path.join(base_dir, sub_id, x))]
+        ct_sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
+                       if 'CT_' in x and os.path.isdir(os.path.join(base_dir, sub_id, x))
+                       and glob.glob(os.path.join(base_dir, sub_id, x, 'CT/1-*'))]
 
         if sessions:
             sequences = list(set([y.split('.nii.gz')[0].lower() for x in sessions
@@ -89,6 +92,17 @@ class BaseDatabase():
         else:
             raise Exception('Nor T1 neither T1KM were found in {}. You need at least one of them '
                             'in order to perform registration.'.format(sub_id))
+        self.add_subfolder = False
+        if ext == '' and sessions:
+            dcms = [y for x in sessions for y in glob.glob(os.path.join(base_dir, sub_id, x, '*/*.dcm'))]
+            if not dcms:
+                dcms = [y for x in sessions for y in glob.glob(
+                    os.path.join(base_dir, sub_id, x, '*/1-*', '*.dcm'))]
+                if dcms:
+                    self.add_subfolder = True
+#                 else:
+#                     raise Exception('It seems that there are no DICOM files in any '
+#                                     'session. Please check.')
         if sequences and ref_sequence:
             sequences.remove(ref_sequence)
         if ref_session:
@@ -110,6 +124,7 @@ class BaseDatabase():
             rt['rtstruct'] = []
             rt['rtct'] = []
             rt['session'] = []
+#             rt['labels'] = []
             for rt_session in rt_sessions:
                 if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTDOSE')):
                     physical = [x for x in os.listdir(os.path.join(
@@ -120,6 +135,8 @@ class BaseDatabase():
                         right_dcm = check_dcm_dose(dcms)
                         if not right_dcm:
                             physical = []
+                        else:
+                            physical = ['PHYS']
                     rbe = [x for x in os.listdir(os.path.join(
                         base_dir, sub_id, rt_session, 'RTDOSE')) if '1-RBE' in x]
                     if rbe:
@@ -128,17 +145,22 @@ class BaseDatabase():
                         right_dcm = check_dcm_dose(dcms)
                         if not right_dcm:
                             rbe = []
-                    if not physical and not rbe:
-                        doses = [x for x in os.listdir(os.path.join(
-                            base_dir, sub_id, rt_session, 'RTDOSE'))]
-                        if doses:
-                            dcms = [x for y in doses for x in glob.glob(os.path.join(
-                                base_dir, sub_id, rt_session, 'RTDOSE', y, '*.dcm'))]
-                            right_dcm = check_dcm_dose(dcms)
-                            if not right_dcm:
-                                doses = []
-                    else:
-                        doses = []
+                        else:
+                            rbe = ['RBE']
+#                     if not physical and not rbe:
+                    doses = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTDOSE')) if '1-RBE' not in x
+                        and '1-PHY' not in x]
+                    if doses:
+                        dcms = [x for y in doses for x in glob.glob(os.path.join(
+                            base_dir, sub_id, rt_session, 'RTDOSE', y, '*.dcm'))]
+                        right_dcm = check_dcm_dose(dcms)
+                        if not right_dcm:
+                            doses = []
+                        else:
+                            doses = ['RTDOSE']
+#                     else:
+#                         doses = []
                     rt['physical'] = rt['physical']+physical
                     rt['rbe'] = rt['rbe'] + rbe
                     rt['doses'] = rt['doses'] + doses
@@ -150,14 +172,23 @@ class BaseDatabase():
                     rtct = [x for x in os.listdir(os.path.join(
                         base_dir, sub_id, rt_session, 'RTCT')) if '1-' in x]
                     rt['rtct'] = rt['rtct'] + rtct
-                rt['session'].append(rt_session)
+                if [rt[x] for x in rt if rt[x]]:
+#                     rt['labels'].append(rt_session)
+                    rt['session'].append(rt_session)
         elif rt_sessions and not self.process_rt:
             rt['session'] = []
             for rt_session in rt_sessions:
                 rt['session'].append(rt_session)
         else:
             rt = None
-
+        
+        if rt is not None and not [rt[x] for x in rt if rt[x]]:
+            rt = None
+        if rt is not None:
+            len_rt_sessions = len(rt['session'])
+            for key in rt:
+                if len(rt[key]) != len_rt_sessions:
+                    rt[key] = []
         self.sessions = sessions
         self.reference = reference
         self.t10 = t10
@@ -165,6 +196,7 @@ class BaseDatabase():
         self.ref_sequence = ref_sequence
         self.rt = rt
         self.ext = ext
+        self.ct_sessions = ct_sessions
 
         field_template, template_args, outfields = self.define_datasource_inputs()
 
@@ -184,12 +216,16 @@ class BaseDatabase():
         rt = self.rt
         ext = self.ext
         process_rt = self.process_rt
+        ct_sessions = self.ct_sessions
 
         field_template = dict()
         template_args = dict()
         outfields = ref_sequence+sequences
         for seq in ref_sequence+sequences:
-            field_template[seq] = '%s/%s/{0}{1}'.format(seq.upper(), ext)
+            if self.add_subfolder:
+                field_template[seq] = '%s/%s/{0}/1-*'.format(seq.upper())
+            else:
+                field_template[seq] = '%s/%s/{0}{1}'.format(seq.upper(), ext)
             template_args[seq] = [['sub_id', 'sessions']]
         if t10:
             field_template['t1_0'] = '%s/%s/T1{0}'.format(ext)
@@ -199,6 +235,10 @@ class BaseDatabase():
             field_template['reference'] = '%s/%s/CT{0}'.format(ext)
             template_args['reference'] = [['sub_id', 'ref_ct']]
             outfields.append('reference')
+        if ct_sessions:
+            field_template['ct'] = '%s/%s/CT/1-*'
+            template_args['ct'] = [['sub_id', 'ct_session']]
+            outfields.append('ct')
         if rt and process_rt:
             physical = rt['physical']
             rbe = rt['rbe']
@@ -254,6 +294,8 @@ class BaseDatabase():
         datasource.inputs.ref_t1 = 'T10'
         if self.rt is not None:
             datasource.inputs.rt = self.rt['session']
+        if self.ct_sessions:
+            datasource.inputs.ct_session = self.ct_sessions
         
         return datasource
 

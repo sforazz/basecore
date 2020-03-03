@@ -8,7 +8,7 @@ from basecore.workflows.base import BaseWorkflow
 
 class RadiomicsWorkflow(BaseWorkflow):
 
-    def __init__(self, regex, roi_selection=False, **kwargs):
+    def __init__(self, regex=None, roi_selection=False, **kwargs):
         
         super().__init__(**kwargs)
         self.regex = regex
@@ -44,6 +44,9 @@ class RadiomicsWorkflow(BaseWorkflow):
         
         field_template['rts_dcm'] = '%s/%s/RTSTRUCT_used/*dcm'
         template_args['rts_dcm'] = [['sub_id', 'rt']]
+
+        field_template['rois'] = '%s/%s/out_struct*'
+        template_args['rois'] = [['sub_id', 'rt']]
         
         field_template.update(self.field_template)
         template_args.update(self.template_args)
@@ -78,7 +81,8 @@ class RadiomicsWorkflow(BaseWorkflow):
     
         voxelizer = nipype.MapNode(interface=Voxelizer(),
                                    iterfield=['reference', 'struct_file'],
-                                   name='voxelizer')
+                                   name='voxelizer',
+                                   nested=False)
         voxelizer.inputs.regular_expression = regex
         voxelizer.inputs.multi_structs = True
         voxelizer.inputs.binarization = True
@@ -113,25 +117,48 @@ class RadiomicsWorkflow(BaseWorkflow):
         return workflow
     
     
-    def ct_features_extraction(self, sub_id, datasource, sessions, result_dir,
-                               nipype_cache, base_workflow, rois):
-    
+    def ref_ct_features_extraction(self, rois=None, base_workflow=None):
+
+        self.datasource()
+
+        datasource = self.data_source
+        nipype_cache = self.nipype_cache
+        result_dir = self.result_dir
+        sub_id = self.sub_id
+#         sessions = self.sessions
+
         workflow = nipype.Workflow('features_extraction_workflow', base_dir=nipype_cache)
     
         datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
         substitutions = [('subid', sub_id)]
+        substitutions += [('results/', '{}/'.format(self.workflow_name))]
     
         features = nipype.MapNode(interface=FeatureExtraction(),
                                   iterfield=['input_image', 'rois'],
                                   name='features_extraction')
-        features.inputs.parameter_file = '/home/fsforazz/Downloads/Params.yaml'
+        features.inputs.parameter_file = '/home/fsforazz/git/core/resources/Params_CT.yaml'
     
-        for i, session in enumerate(sessions):
-            substitutions += [('_features_extraction{}/'.format(i), session+'/')]
+#         for i, session in enumerate(sessions):
+#             substitutions += [('_features_extraction{}/'.format(i), session+'/')]
+        substitutions += [('_features_extraction0/', 'REF/')]
         datasink.inputs.substitutions =substitutions
     
         workflow.connect(datasource, 'reference', features, 'input_image')
-        workflow.connect(base_workflow, rois, features, 'rois')
-        workflow.connect(features, 'feature_files', datasink, 'features_extraction.@csv_file')
+        if base_workflow is not None:
+            workflow.connect(base_workflow, rois, features, 'rois')
+        else:
+            workflow.connect(datasource, 'rois', features, 'rois')
+        workflow.connect(features, 'feature_files', datasink,
+                         'results.subid.@csv_file')
+        workflow = self.datasink(workflow, datasink)
     
+        return workflow
+    
+    def workflow_setup(self, ct_feat_ext=False):
+
+        if ct_feat_ext:
+            workflow = self.ref_ct_features_extraction()
+        else:
+            workflow = self.workflow()
+
         return workflow

@@ -50,7 +50,8 @@ def check_rtstruct(basedir, regex):
     no_match = []
     for root, _, files in os.walk(basedir):
         for name in files:
-            if ('RTDOSE' in name and os.path.isdir(os.path.join(root, 'RTSTRUCT_used'))):
+            if (('RTDOSE' in name and name.endswith('.nii.gz'))
+                    and os.path.isdir(os.path.join(root, 'RTSTRUCT_used'))):
                 sub_name = root.split('/')[-2]
                 try:
                     rts = glob.glob(os.path.join(root, 'RTSTRUCT_used', '*.dcm'))[0]
@@ -62,7 +63,7 @@ def check_rtstruct(basedir, regex):
                 except IndexError:
                     print('No RTSTRUCT for {}'.format(root.split('/')[-2]))
                     no_rt.append(sub_name)
-    return data
+    return list(set(data))
 
 
 def check_rts(rts, regex):

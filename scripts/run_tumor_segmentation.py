@@ -34,6 +34,7 @@ if __name__ == "__main__":
             xnat_processed_session=ARGS.xnat_processed_session,
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
             cluster_project_id=ARGS.cluster_project_id)
-        workflow.runner()
+        wf = workflow.workflow_setup()
+        workflow.runner(wf)
 
     print('Done!')

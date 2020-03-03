@@ -28,8 +28,9 @@ if __name__ == "__main__":
         workflow = DataCuration(
             sub_id='', input_dir=BASE_DIR, work_dir=ARGS.work_dir,
             process_rt=True)
-        workflow.runner(data_sorting=True)
-        BASE_DIR = os.path.join(ARGS.work_dir, 'workflows_output', 'RT_sorted_dir')
+        wf = workflow.workflow_setup(data_sorting=True)
+        workflow.runner(wf, cores=ARGS.num_cores)
+        BASE_DIR = os.path.join(ARGS.work_dir, 'workflows_output', 'Sorted_Data')
         sub_list = os.listdir(BASE_DIR)
 
     for sub_id in sub_list:
@@ -43,7 +44,7 @@ if __name__ == "__main__":
             xnat_processed_session=ARGS.xnat_processed_session, process_rt=True,
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
             cluster_project_id=ARGS.cluster_project_id)
-
-        workflow.runner(cores=ARGS.num_cores)
+        wf = workflow.workflow_setup()
+        workflow.runner(wf, cores=ARGS.num_cores)
 
     print('Done!')

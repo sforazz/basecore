@@ -3,20 +3,20 @@ from nipype.interfaces.base import (
     traits, BaseInterfaceInputSpec, InputMultiPath)
 import pydicom
 import numpy as np
-from operator import itemgetter
-from pydicom.errors import InvalidDicomError
+from basecore.utils.dicom import dcm_check, dcm_info
 from pathlib import Path
 import shutil
 import os
 import nibabel as nib
 import glob
-from basecore.utils.filemanip import split_filename
+from basecore.utils.filemanip import split_filename, label_move_image
 from skimage.transform import resize
 import pydicom as pd
 import re
 import subprocess as sp
 from collections import defaultdict
 from nipype.interfaces.base import isdefined
+from basecore.converters.dicom import DicomConverter
 
 
 RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
@@ -84,8 +84,8 @@ class DicomCheck(BaseInterface):
                         ds.StructureSetROISequence[i].ROIName = new_roiname
                     ds.save_as(rt_dcm)
         else:
-            dicoms, im_types, series_nums = self.dcm_info()
-            dicoms = self.dcm_check(dicoms, im_types, series_nums)
+            dicoms, im_types, series_nums = dcm_info(dicom_dir)
+            dicoms = dcm_check(dicoms, im_types, series_nums)
             if dicoms:
                 if not os.path.isdir(wd):
                     os.makedirs(wd)
@@ -111,100 +111,6 @@ class DicomCheck(BaseInterface):
             outputs['dose_output'] = self.scan_name
 
         return outputs
-
-    def dcm_info(self):
-        """Function to extract information from a list of DICOM files in one folder. It returns a list of
-        unique image types and scan numbers found in the input list of DICOMS.
-        Parameters
-        ----------
-        dcm_folder : str
-            path to an existing folder with DICOM files
-        Returns
-        -------
-        dicoms : list
-            list of DICOM files in the folder
-        image_types : list
-            list of unique image types extracted from the DICOMS
-        series_nums : list
-            list of unique series numbers extracted from the DICOMS
-        """
-        dcm_folder = Path(self.inputs.dicom_dir)
-
-        dicoms = sorted(list(dcm_folder.glob('*.dcm')))
-        if not dicoms:
-            dicoms = sorted(list(dcm_folder.glob('*.IMA')))
-            if not dicoms:
-                raise Exception('No DICOM files found in {}'.format(dcm_folder))
-
-        ImageTypes = []
-        SeriesNums = []
-        toRemove = []
-        InstanceNums = []
-        for dcm in dicoms:
-            #Check whether the dicom is compressed, if yes decompress
-            if (pd.read_file(str(dcm)).file_meta.TransferSyntaxUID
-                    not in NotCompressedPixelTransferSyntaxes):
-                self.decompress_dicom(dcm)
-            try:
-                header = pydicom.read_file(str(dcm))
-                ImageTypes.append(tuple(header.ImageType))
-                SeriesNums.append(header.SeriesNumber)
-                InstanceNums.append(header.InstanceNumber)
-            except AttributeError:
-                print ('{} seems to do not have the right DICOM fields and '
-                       'will be removed from the folder'.format(dcm))
-                toRemove.append(dcm)
-            except InvalidDicomError:
-                print ('{} seems to do not have a readable DICOM header and '
-                       'will be removed from the folder'.format(dcm))
-                toRemove.append(dcm)
-        # the following lines are to check whether or not there are 2 set of exactly the same DICOM files in the folder
-        if (len(InstanceNums) == 2*(len(set(InstanceNums)))) and len(set(SeriesNums)) == 1:
-            sortedInstanceNums = sorted(zip(dicoms, InstanceNums), key=itemgetter(1))
-            uniqueInstanceNums = [x[0] for x in sortedInstanceNums[:][0:-1:2]]
-            toRemove = toRemove+uniqueInstanceNums
-        if toRemove:
-            for f in toRemove:
-                dicoms.remove(f)
-
-        return dicoms, list(set(ImageTypes)), list(set(SeriesNums))
-
-    def dcm_check(self, dicoms, im_types, series_nums):
-        """Function to check the DICOM files in one folder. It is based on the glioma test data.
-        This function checks the type of the image (to exclude those that are localizer acquisitions)
-        and the series number (if in one folder there are more than one scans then this function will
-        return the second one, assuming that it is the one after the contrast agent injection).
-        It returns a list of DICOMS which belong to one scan only, ignoring localizer scans. 
-        Parameters
-        ----------
-        dicoms : list
-            list of DICOMS in one folder
-        im_types : list
-            list of all image types extracted from the DICOM headers
-        series_nums : list
-            list of all scan numbers extracted from the DICOM headers
-        Returns
-        -------
-        dcms : list
-            list of DICOMS files
-        """
-        if len(im_types) > 1:
-            im_type = list([x for x in im_types if not 'PROJECTION IMAGE' in x
-                            and 'LOCALIZER' not in x][0])
-
-            dcms = [x for x in dicoms if pydicom.read_file(str(x)).ImageType==im_type]
-        elif len(series_nums) > 1:
-            series_num = np.max(series_nums)
-            dcms = [x for x in dicoms if pydicom.read_file(str(x)).SeriesNumber==series_num]
-        else:
-            dcms = dicoms
-
-        return [str(x) for x in dcms]
-    
-    def decompress_dicom(self, dicom):
-    
-        cmd = ("gdcmconv --raw {0} {1} ".format(dicom, dicom))
-        sp.check_output(cmd, shell=True) 
 
 
 class ConversionCheckInputSpec(BaseInterfaceInputSpec):
@@ -490,16 +396,142 @@ class GetRefRTDose(BaseInterface):
         return outputs
 
 
+class CreateSubjectsListInputSpec(BaseInterfaceInputSpec):
+
+    input_dir = Directory(exists=True, desc='Input directory to prepare properly.')
+
+
+class CreateSubjectsListOutputSpec(TraitedSpec):
+    
+    file_list = traits.List()
+
+
+class CreateSubjectsList(BaseInterface):
+
+    input_spec = CreateSubjectsListInputSpec
+    output_spec = CreateSubjectsListOutputSpec
+    
+    def _run_interface(self, runtime):
+        input_dir = self.inputs.input_dir
+        file_list = []
+        for path, _, files in os.walk(input_dir):
+            for f in files:
+                if '.dcm' in f:
+                    file_list.append(os.path.join(path, f))
+        self.file_list = file_list
+        
+        return runtime
+    
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['file_list'] = self.file_list
+
+        return outputs
+
+
+class FileCheckInputSpec(BaseInterfaceInputSpec):
+    
+    input_file = File(exists=True, desc='Input file to check.')
+    renaming = traits.Bool(False, desc='Whether or not to use the information stored'
+                           'in the DICOM header to rename the subject and sessions '
+                           'folders. If False, the file path will be splitted '
+                           'and the subject name will be taken from there. In this '
+                           'case, the subject_name_position must be provided.'
+                           'Default is False.', usedefault=True)
+    subject_name_position = traits.Int(
+        -3, usedefault=True, desc='The position of the subject name in the splitted '
+        'file path (file_path.split("/")). Default is -3, so it assumes that the subject '
+        'name is in the third position starting from the end of the file path.')
+
+
+class FileCheckOutputSpec(TraitedSpec):
+    
+    out_list = traits.List(desc='Prepared folder.')
+
+
+class FileCheck(BaseInterface):
+    
+    input_spec = FileCheckInputSpec
+    output_spec = FileCheckOutputSpec
+    
+    def _run_interface(self, runtime):
+        
+        filename = self.inputs.input_file
+        renaming = self.inputs.renaming
+        if not renaming:
+            sub_name_position = self.inputs.subject_name_position
+
+        scans = defaultdict(list)
+        patient_names = defaultdict(list)
+        scan_dates = defaultdict(list)
+
+        try:
+            ds = pydicom.dcmread(filename,force = True)
+        except:
+            print('{} could not be read, dicom '
+                  'file may be corrupted'.format(filename))
+        try:
+            seriesDescription=ds.SeriesDescription.upper().replace('_','')
+        except:
+            try:
+                seriesDescription=ds.Modality.upper().replace('_','')
+            except:
+                seriesDescription='NONE'
+        try:
+            studyInstance = ds.StudyInstanceUID
+        except:
+            studyInstance='NONE'
+        try:
+            seriesInstance = ds.SeriesInstanceUID
+        except:
+            seriesInstance='NONE'
+        key = seriesDescription +'_' + seriesInstance + '_' + studyInstance
+        key = self.strip_non_ascii(re.sub(r'[^\w]', '', key))
+        key = key.replace('_','-')
+        scans[key].append(filename)
+        if renaming:
+            try:
+                patient_names[key].append(ds.PatientID)
+            except AttributeError:
+                print('No patient ID for {}'.format(filename))
+                patient_names[key].append('Corrupted')
+        else:
+            sub_name = filename.split('/')[sub_name_position]
+            patient_names[key].append(sub_name)
+        try:
+            scan_dates[key].append(ds.StudyDate)
+        except:
+            print('No study date for {}'.format(filename))
+            scan_dates[key].append('Corrupted')
+
+        self.out_list = [scans, patient_names, scan_dates]
+
+        return runtime
+
+    def strip_non_ascii(self, string):
+        ''' Returns the string without non ASCII characters'''
+        stripped = (c for c in string if 0 < ord(c) < 127)
+        return ''.join(stripped)
+
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        outputs['out_list'] = self.out_list
+
+        return outputs
+
+
 class FolderPreparationInputSpec(BaseInterfaceInputSpec):
     
-    input_dir = Directory(exists=True, desc='Input directory to prepare properly.')
+    input_list = traits.List(desc='Input directory to prepare properly.')
     out_folder = Directory('prepared_dir', usedefault=True,
                            desc='Prepared folder.')
 
 
 class FolderPreparationOutputSpec(TraitedSpec):
     
-    out_folder = Directory(exists=True, desc='Prepared folder.')
+    out_folder = traits.List(desc='Prepared folder.')
+    subject_names = traits.List(desc='Prepared folder.')
+#     out_folder = Directory(exists=True, desc='Prepared folder.')
 
 
 class FolderPreparation(BaseInterface):
@@ -509,45 +541,18 @@ class FolderPreparation(BaseInterface):
     
     def _run_interface(self, runtime):
         
-        input_dir = self.inputs.input_dir
+        input_list = self.inputs.input_list
         output_dir = os.path.abspath(self.inputs.out_folder)
 
-        scans=defaultdict(list)
+        scans = defaultdict(list)
         patient_names = defaultdict(list)
         scan_dates = defaultdict(list)
-        for path, _, files in os.walk(input_dir):
-            for f in files:
-                if '.dcm' in f:
-                    filename = os.path.join(path, f)
-                    try:
-                        ds = pydicom.dcmread(filename,force = True)
-                    except:
-                        print('{} could not be read, dicom '
-                              'file may be corrupted'.format(filename))
-                    try:
-                        seriesDescription=ds.SeriesDescription.upper().replace('_','')
-                    except:
-                        try:
-                            seriesDescription=ds.Modality.upper().replace('_','')
-                        except:
-                            seriesDescription='NONE'
-                    try:
-                        studyInstance = ds.StudyInstanceUID
-                    except:
-                        studyInstance='NONE'
-                    try:
-                        seriesInstance = ds.SeriesInstanceUID
-                    except:
-                        seriesInstance='NONE'
-                    key = seriesDescription +'_' + seriesInstance + '_' + studyInstance
-                    key = self.strip_non_ascii(re.sub(r'[^\w]', '', key))
-                    key = key.replace('_','-')
-                    scans[key].append(filename)
-                    patient_names[key].append(ds.PatientID)
-                    try:
-                        scan_dates[key].append(ds.StudyDate)
-                    except:
-                        print('')
+        
+        for el in input_list:
+            key = list(el[0].keys())[0]
+            scans[key].append(el[0][key][0])
+            patient_names[key].append(el[1][key][0])
+            scan_dates[key].append(el[2][key][0])
 
         for key in scans.keys():
             for file in scans[key]:
@@ -568,10 +573,117 @@ class FolderPreparation(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         if isdefined(self.inputs.out_folder):
-            outputs['out_folder'] = os.path.abspath(
-                self.inputs.out_folder)
+            outputs['out_folder'] = sorted(glob.glob(os.path.abspath(
+                self.inputs.out_folder+'/*')))
+            outputs['subject_names'] = [
+                x.split('/')[-1] for x in sorted(glob.glob(os.path.abspath(
+                self.inputs.out_folder+'/*')))]
 
         return outputs
+# class FolderPreparationInputSpec(BaseInterfaceInputSpec):
+#     
+#     input_dir = Directory(exists=True, desc='Input directory to prepare properly.')
+#     out_folder = Directory('prepared_dir', usedefault=True,
+#                            desc='Prepared folder.')
+#     renaming = traits.Bool(False, desc='Whether or not to use the information stored'
+#                            'in the DICOM header to rename the subject and sessions '
+#                            'folders. If False, the file path will be splitted '
+#                            'and the subject name will be taken from there. In this '
+#                            'case, the subject_name_position must be provided.'
+#                            'Default is False.')
+#     subject_name_position = traits.Int(
+#         -3, usedefault=True, desc='The position of the subject name in the splitted '
+#         'file path (file_path.split("/")). Default is -3, so it assumes that the subject '
+#         'name is in the third position starting from the end of the file path.')
+# 
+# 
+# class FolderPreparationOutputSpec(TraitedSpec):
+#     
+#     out_folder = Directory(exists=True, desc='Prepared folder.')
+# 
+# 
+# class FolderPreparation(BaseInterface):
+#     
+#     input_spec = FolderPreparationInputSpec
+#     output_spec = FolderPreparationOutputSpec
+#     
+#     def _run_interface(self, runtime):
+#         
+#         input_dir = self.inputs.input_dir
+#         output_dir = os.path.abspath(self.inputs.out_folder)
+#         renaming = self.inputs.renaming
+#         if not renaming:
+#             sub_name_position = self.inputs.subject_name_position
+# 
+#         scans=defaultdict(list)
+#         patient_names = defaultdict(list)
+#         scan_dates = defaultdict(list)
+#         for path, _, files in os.walk(input_dir):
+#             for f in files:
+#                 if '.dcm' in f:
+#                     filename = os.path.join(path, f)
+#                     try:
+#                         ds = pydicom.dcmread(filename,force = True)
+#                     except:
+#                         print('{} could not be read, dicom '
+#                               'file may be corrupted'.format(filename))
+#                     try:
+#                         seriesDescription=ds.SeriesDescription.upper().replace('_','')
+#                     except:
+#                         try:
+#                             seriesDescription=ds.Modality.upper().replace('_','')
+#                         except:
+#                             seriesDescription='NONE'
+#                     try:
+#                         studyInstance = ds.StudyInstanceUID
+#                     except:
+#                         studyInstance='NONE'
+#                     try:
+#                         seriesInstance = ds.SeriesInstanceUID
+#                     except:
+#                         seriesInstance='NONE'
+#                     key = seriesDescription +'_' + seriesInstance + '_' + studyInstance
+#                     key = self.strip_non_ascii(re.sub(r'[^\w]', '', key))
+#                     key = key.replace('_','-')
+#                     scans[key].append(filename)
+#                     if renaming:
+#                         try:
+#                             patient_names[key].append(ds.PatientID)
+#                         except AttributeError:
+#                             print('No patient ID for {}'.format(f))
+#                             patient_names[key].append('Corrupted')
+#                     else:
+#                         sub_name = filename.split('/')[sub_name_position]
+#                         patient_names[key].append(sub_name)
+#                     try:
+#                         scan_dates[key].append(ds.StudyDate)
+#                     except:
+#                         print('No study date for {}'.format(f))
+#                         scan_dates[key].append('Corrupted')
+# 
+#         for key in scans.keys():
+#             for file in scans[key]:
+#                 out_basename = os.path.join(patient_names[key][0],
+#                                             scan_dates[key][0])
+#                 dir_name= os.path.join(output_dir, out_basename, key)
+#                 if not os.path.isdir(dir_name):
+#                     os.makedirs(dir_name)
+#                 shutil.copy2(Path(file), dir_name)
+# 
+#         return runtime
+# 
+#     def strip_non_ascii(self, string):
+#         ''' Returns the string without non ASCII characters'''
+#         stripped = (c for c in string if 0 < ord(c) < 127)
+#         return ''.join(stripped)
+# 
+#     def _list_outputs(self):
+#         outputs = self._outputs().get()
+#         if isdefined(self.inputs.out_folder):
+#             outputs['out_folder'] = os.path.abspath(
+#                 self.inputs.out_folder)
+# 
+#         return outputs
 
 
 class FolderSortingInputSpec(BaseInterfaceInputSpec):
@@ -579,11 +691,13 @@ class FolderSortingInputSpec(BaseInterfaceInputSpec):
     input_dir = Directory(exists=True, help='Input directory to sort.')
     out_folder = Directory('sorted_dir', usedefault=True,
                            desc='Prepared folder.')
+    
 
 
 class FolderSortingOutputSpec(TraitedSpec):
     
     out_folder = Directory(help='Sorted folder.')
+    mr_images = traits.List(help='List of MR images to be classified using MRCLASS')
 
 
 class FolderSorting(BaseInterface):
@@ -596,64 +710,166 @@ class FolderSorting(BaseInterface):
         input_dir = self.inputs.input_dir
         out_dir = os.path.abspath(self.inputs.out_folder)
 
-        modality_List = ['RTDOSE','CT','RTSTRUCT','RTPLAN']
+        modality_List = ['RTDOSE','CT','RTSTRUCT','RTPLAN', 'PET']
         
-        images=glob.glob(input_dir+'/*/*/*')
+        images=glob.glob(input_dir+'/*/*')
+        for_inference=[]
+
         for i in images:
             if os.path.isdir(i):
-                dcm_files = [ os.path.join(i, item) for item in os.listdir(i)
+                dcm_files = [os.path.join(i, item) for item in os.listdir(i)
                              if ('.dcm' in item)]
             else:
                 continue
             try:
-                ds = pydicom.dcmread(dcm_files[0],force=True)
+                ds = pydicom.dcmread(dcm_files[0], force=True)
                 modality_check = ds.Modality
             except:
                 modality_check = ''
             if modality_check == 'RTSS':
                 modality_check = 'RTSTRUCT'
             if modality_check in modality_List:
-                self.label_move_image(i, modality_check, out_dir)
+                label_move_image(i, modality_check, out_dir)
+            elif modality_check=='MR' or modality_check=='OT':
+                #checking for duplicates or localizer
+                new_image, i = label_move_image(i, '', out_dir,
+                                                renaming=False)
+                dicoms, im_types, series_nums = dcm_info(new_image)
+                dicoms_fl = dcm_check(dicoms, im_types, series_nums)
+#                 corrupted = [f for f in dicoms if str(f) not in dicoms_fl]
+                [os.remove(f) for f in dicoms if str(f) not in dicoms_fl]
+                good = [f for f in dicoms if str(f) in dicoms_fl]
+#                 [os.remove(f) for f in dicoms if str(f) not in dicoms_fl]
+                if good:
+                    converter = DicomConverter(new_image)
+                    nifti_image = converter.convert(rename_dicom=True)
+                    if nifti_image is not None:
+                        for_inference.append(nifti_image)
+                    else:
+                        label_move_image(i, 'error_converting', out_dir)
+                        print('Error converting',str(new_image))
             else:
-                self.label_move_image(i, 'NOT_RT', out_dir)
+                label_move_image(i, 'Unknown_modality', out_dir)
+        self.for_inference = for_inference
 
         return runtime
 
-    def label_move_image(self, image, modality, out_dir):
+#     def label_move_image(self, image, modality, out_dir):
+# 
+#         sub_name, tp = image.split('/')[-3:-1]
+#         base_dir_path = os.path.join(out_dir, sub_name, tp)
+#         dir_name = os.path.join(base_dir_path, modality)
+#         if not os.path.isdir(dir_name):
+#             os.makedirs(dir_name)
+#         new_name = self.file_rename(image)
+#         try:
+#             shutil.copytree(new_name, os.path.join(dir_name, new_name.split('/')[-1]))
+#             outname = os.path.join(dir_name, new_name.split('/')[-1])
+#         except:
+#             files = [item for item in glob.glob(dir_name+'/*')
+#                      if new_name.split('/')[-1] in item ]
+#             if len(files) == 1:
+#                 new_name1 = new_name+'_1'
+#             else:
+#                 new_name1 = new_name+'_'+ str(int(len(files)))
+#             # Renaming old directory
+#             shutil.move(new_name, new_name1)  
+#             # Copy to the sorting location  
+#             shutil.copytree(new_name1, os.path.join(dir_name, new_name1.split('/')[-1]))
+#             outname = os.path.join(dir_name, new_name1.split('/')[-1])
+#         
+#         return outname
+# 
+#     def file_rename(self, image):
+# 
+#         base_dir_path = os.path.split(image)[0]
+#         name = image.split('/')[-1]
+#         name_parts = name.split('-')
+#         if not name_parts[0]:
+#             new_name = os.path.join(base_dir_path, 'image')
+#         elif os.path.isdir(os.path.join(base_dir_path, name_parts[0])):
+#             new_name = os.path.join(base_dir_path, name_parts[0][:-1])
+#         else:
+#             new_name = os.path.join(base_dir_path, name_parts[0])
+#         shutil.move(image, new_name)
+#         return new_name
 
-        sub_name, tp = image.split('/')[-3:-1]
-        base_dir_path = os.path.join(out_dir, sub_name, tp)
-        dir_name = os.path.join(base_dir_path, modality)
-        if not os.path.isdir(dir_name):
-            os.makedirs(dir_name)
-        new_name = self.file_rename(image)
-        try:
-            shutil.copytree(new_name, os.path.join(dir_name, new_name.split('/')[-1]))   
-        except:
-            files = [item for item in glob.glob(dir_name+'/*')
-                     if new_name.split('/')[-1] in item ]
-            if len(files) == 1:
-                new_name1 = new_name+'_1'
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        if isdefined(self.inputs.out_folder):
+            outputs['out_folder'] = os.path.abspath(
+                self.inputs.out_folder)
+        outputs['mr_images'] = self.for_inference
+
+        return outputs
+
+
+class FolderMergeInputSpec(BaseInterfaceInputSpec):
+    
+    input_list = traits.List(help='Input directory to sort.')
+    out_folder = Directory('Sorted_Data', usedefault=True,
+                           desc='Prepared folder.')
+
+
+class FolderMergeOutputSpec(TraitedSpec):
+    
+    out_folder = Directory(help='Sorted folder.')
+
+
+class FolderMerge(BaseInterface):
+    
+    input_spec = FolderMergeInputSpec
+    output_spec = FolderMergeOutputSpec
+    
+    def _run_interface(self, runtime):
+        
+        input_list = self.inputs.input_list
+        out_dir = os.path.abspath(self.inputs.out_folder)
+        
+        for directories in input_list:
+            mr_dir = directories[0]
+            rt_dir = directories[1]
+            if not os.path.isdir(mr_dir):
+                print('No MRI data found')
+                mr_tocopy = []
+                mr_sub_name = None
             else:
-                new_name1 = new_name+'_'+ str(int(len(files)))
-            # Renaming old directory
-            shutil.move(new_name, new_name1)  
-            # Copy to the sorting location  
-            shutil.copytree(new_name1, os.path.join(dir_name, new_name1.split('/')[-1]))
+                mr_sub_name = os.listdir(mr_dir)[0]
+                mr_tocopy = sorted(glob.glob(os.path.join(mr_dir, mr_sub_name, '*')))
+            if not os.path.isdir(rt_dir):
+                print('No RT or CT data found')
+                rt_tocopy = []
+                rt_sub_name = None
+            else:
+                rt_sub_name = os.listdir(rt_dir)[0]
+                rt_tocopy = sorted(glob.glob(os.path.join(rt_dir, rt_sub_name, '*')))
+#             mr_sub_name = os.listdir(mr_dir)[0]
+            if (rt_sub_name is not None and mr_sub_name is not None) and rt_sub_name != mr_sub_name:
+                raise Exception('Subject name is different between MR and RT '
+                                'result folder. Something went wrong.')
+            if mr_sub_name is not None:
+                sub_name = mr_sub_name
+            elif rt_sub_name is not None:
+                sub_name = rt_sub_name
+            else:
+                sub_name = None
+#             mr_tocopy = sorted(glob.glob(os.path.join(mr_dir, mr_sub_name, '*')))
+#             rt_tocopy = sorted(glob.glob(os.path.join(rt_dir, rt_sub_name, '*')))
+            if sub_name is not None:
+                if not os.path.isdir(os.path.join(out_dir, sub_name)):
+                    os.makedirs(os.path.join(out_dir, sub_name))
+                for folder in mr_tocopy+rt_tocopy:
+                    folder_name = folder.split('/')[-1]
+                    shutil.copytree(folder, os.path.join(
+                        out_dir, sub_name,folder_name))
+#             to_copy = glob.glob(directory+'/*')[0]
+#             sub_name = to_copy.split('/')[-1]
+#             outpath = os.path.join(out_dir, sub_name)
+#             if not os.path.isdir(outpath):
+#                 os.makedirs(outpath)
+#             shutil.copytree(to_copy, outpath)
 
-    def file_rename(self, image):
-
-        base_dir_path = os.path.split(image)[0]
-        name = image.split('/')[-1]
-        name_parts = name.split('-')
-        if not name_parts[0]:
-            new_name = os.path.join(base_dir_path, 'image')
-        elif os.path.isdir(os.path.join(base_dir_path, name_parts[0])):
-            new_name = os.path.join(base_dir_path, name_parts[0][:-1])
-        else:
-            new_name = os.path.join(base_dir_path, name_parts[0])
-        shutil.move(image, new_name)
-        return new_name
+        return runtime
 
     def _list_outputs(self):
         outputs = self._outputs().get()

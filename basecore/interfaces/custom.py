@@ -6,8 +6,17 @@ import subprocess as sp
 from collections import defaultdict
 from nipype.interfaces.base import (
     BaseInterface, TraitedSpec, Directory,
-    BaseInterfaceInputSpec)
+    BaseInterfaceInputSpec, traits, File, InputMultiPath)
 from nipype.interfaces.base import isdefined
+from torchvision import transforms
+import torch
+from torch.utils.data import DataLoader
+from basecore.utils.torch import (
+    resize_2Dimage, ZscoreNormalization, ToTensor,
+    load_checkpoint, MRClassifierDataset_test)
+from basecore.utils.filemanip import label_move_image, create_move_toDir
+import json
+import pickle
 
 
 ExplicitVRLittleEndian = '1.2.840.10008.1.2.1'
@@ -19,6 +28,9 @@ NotCompressedPixelTransferSyntaxes = [ExplicitVRLittleEndian,
                                       DeflatedExplicitVRLittleEndian,
                                       ExplicitVRBigEndian]
 
+
+RESOURCES_PATH = os.path.abspath(os.path.join(os.path.split(__file__)[0],
+                                 os.pardir, os.pardir, 'resources'))
 
 class RTDataSortingInputSpec(BaseInterfaceInputSpec):
     
@@ -43,10 +55,14 @@ class RTDataSorting(BaseInterface):
         out_dir = os.path.abspath(self.inputs.out_folder)
 
         modality_list = [ 'RTPLAN' , 'RTSTRUCT', 'RTDOSE', 'CT']
+        other_modalities = ['MR', 'OT', 'PET']
         
         input_tp_folder = list(set([x for x in glob.glob(input_dir+'/*/*')
                                     for y in glob.glob(x+'/*')
                                     for r in modality_list if r in y]))
+        other_tps = [x for r in other_modalities
+                     for x in glob.glob(input_dir+'/*/*/{}'.format(r))]
+
         for tp_folder in input_tp_folder:
             sub_name, tp = tp_folder.split('/')[-2:]
             out_basedir = os.path.join(out_dir, sub_name, 'RT_'+tp)
@@ -55,6 +71,9 @@ class RTDataSorting(BaseInterface):
             plan_name, rtstruct_instance, dose_cubes_instance = self.extract_plan(
                 os.path.join(tp_folder, 'RTPLAN'), os.path.join(out_basedir, 'RTPLAN'))
             if plan_name is None:
+                out_basedir = os.path.join(out_dir, sub_name, 'CT_'+tp)
+                if not os.path.isdir(out_basedir):
+                    shutil.copytree(tp_folder, out_basedir)
                 continue
             if rtstruct_instance is not None:
                 ct_classInstance = self.extract_struct(os.path.join(tp_folder, 'RTSTRUCT'),
@@ -63,15 +82,25 @@ class RTDataSorting(BaseInterface):
             else:
                 print('The RTSTRUCT was not found. With no RTSTRUCT, '
                       'the planning CT instances cannot be extracted')
+                ct_classInstance = None
             if ct_classInstance is not None:
                 self.extract_BPLCT(os.path.join(tp_folder, 'CT'), ct_classInstance,
                                    os.path.join(out_basedir, 'RTCT'))
             if dose_cubes_instance is not None:
                 self.extract_dose_cubes(os.path.join(tp_folder, 'RTDOSE'), dose_cubes_instance,
                                         os.path.join(out_basedir, 'RTDOSE'))
+        for tp_folder in other_tps:
+            sub_name, tp = tp_folder.split('/')[-3:-1]
+            out_basedir = os.path.join(out_dir, sub_name, tp)
+            if not os.path.isdir(out_basedir):
+                os.makedirs(out_basedir)
+            scan_folders = glob.glob(tp_folder+'/*')
+            [shutil.copytree(x, os.path.join(out_basedir, x.split('/')[-1]))
+             for x in scan_folders]
 
         return runtime
-    
+
+
     def extract_plan(self, dir_name, out_dir):
     
         # FInding the RTplan which was used.( taking the last approved plan)
@@ -293,3 +322,168 @@ class RTDataSorting(BaseInterface):
                 self.inputs.out_folder)
 
         return outputs
+
+
+class MRClassInputSpec(BaseInterfaceInputSpec):
+    
+    mr_images = traits.List(desc='List of MR images to be labelled.')
+    checkpoints = traits.Dict(desc='MRClass weights.')
+    sub_checkpoints = traits.Dict(
+        desc='MRClass weights for within modality inference '
+        '(i.e. for T1 vs T1KM classification).')
+    out_folder = Directory('MR_sorted_dir', usedefault=True,
+                           desc='MR data sorted folder.')
+
+class MRClassOutputSpec(TraitedSpec):
+    
+#     labelled_images = traits.Dict(desc='Dictonary with MRClass results.')
+#     unclassifiable = traits.List(desc='List of images that could not be '
+#                                  'classified by MRClass')
+    out_folder = Directory(help='MR Sorted folder.')
+
+
+class MRClass(BaseInterface):
+    
+    input_spec = MRClassInputSpec
+    output_spec = MRClassOutputSpec
+    
+    def _run_interface(self, runtime):
+        
+        checkpoints = self.inputs.checkpoints
+        sub_checkpoints = self.inputs.sub_checkpoints
+        for_inference = self.inputs.mr_images
+        output_dir = os.path.abspath(self.inputs.out_folder)
+
+        th = {'ADC':2,'DIFF':2,'T1':2,'T2':2,'FLAIR':2,'ADC':2,'SWI':2}
+        device = "cpu"
+#         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        labeled, labeled_images = defaultdict(list), defaultdict(list)
+        modalities = ['DIFF','T2','T1']
+        sub_modalities = ['T1','ADC']
+
+        data_transforms = transforms.Compose(
+            [resize_2Dimage(256), ZscoreNormalization(), ToTensor()])
+        for m in modalities:
+            model = load_checkpoint(checkpoints[m])
+            test_dataset = MRClassifierDataset_test(
+                images=for_inference, dummy=os.path.join(RESOURCES_PATH, 'random.nii.gz'),
+                transform=data_transforms)  
+            test_dataloader = DataLoader(
+                test_dataset, batch_size=1, shuffle=False, num_workers=1)
+          
+            for _, data in enumerate(test_dataloader):
+              
+                inputs = data['image']
+                img_name = data['name']
+                  
+                inputs = inputs.to(device)
+                output = model(inputs)
+                prob = output.data.cpu().numpy()
+                actRange = abs(prob[0][0])+abs(prob[0][1])
+                index = output.data.cpu().numpy().argmax()
+                  
+                if index == 0 and actRange > th[m]:
+                    labeled[img_name[0]].append([m,actRange])
+      
+        for key in labeled.keys():
+            if len(labeled[key])>1:
+                if labeled[key][0][1]>labeled[key][1][1]:
+                    del labeled[key][1]
+                else:
+                    del labeled[key][0]
+          
+                      
+        for key in labeled.keys():
+            labeled_images[labeled[key][0][0]].append([key,labeled[key][0][1]])
+              
+        labeled_subImages, labeled_s = defaultdict(list), defaultdict(list)
+        #labeled_images = defaultdict(list)
+        for m in sub_modalities:
+            model = load_checkpoint(sub_checkpoints[m])
+            if m =='ADC':
+                list_images = [i[0] for i in labeled_images['DIFF']]
+            else:
+                list_images = [i[0] for i in labeled_images[m]]
+            test_dataset = MRClassifierDataset_test(
+                images=list_images, dummy=os.path.join(RESOURCES_PATH, 'random.nii.gz'),
+                transform=data_transforms)  
+            test_dataloader = DataLoader(
+                test_dataset, batch_size = 1, shuffle=False, num_workers=8)
+            for _, data in enumerate(test_dataloader):
+              
+                inputs = data['image']
+                img_name = data['name']
+                  
+                inputs = inputs.to(device)
+                output = model(inputs)
+                prob = output.data.cpu().numpy()
+                actRange = abs(prob[0][0])+abs(prob[0][1])
+                index = output.data.cpu().numpy().argmax()
+                if m =='ADC':
+                    if index == 0 and actRange > th[m]:
+                        labeled_s[img_name[0]].append([m,actRange])
+                    else:
+                        labeled_s[img_name[0]].append([m+'KM',actRange])
+                    continue
+                          
+                if index == 0:
+                    labeled_s[img_name[0]].append([m,labeled[img_name[0]][0][1]])
+                else:
+                    labeled_s[img_name[0]].append([m+'KM',labeled[img_name[0]][0][1]])
+                      
+        for key in labeled_s.keys():
+            if labeled_s[key][0][0] != 'ADCKM':
+                labeled_subImages[labeled_s[key][0][0]].append([key,labeled_s[key][0][1]])
+        for key in labeled_images.copy():
+            #if key =='DIFF' or key=='T1' or key=='T2':
+            if key == 'T1' or key == 'DIFF':
+                del labeled_images[key]
+#  
+        self.labelled_images = {**labeled_subImages, **labeled_images}
+        with open('/home/fsforazz/ww.pickle', 'wb') as f:
+            pickle.dump(self.labelled_images, f, protocol=pickle.HIGHEST_PROTOCOL)
+         
+        with open('/home/fsforazz/ww.pickle', 'rb') as handle:
+            self.labelled_images = pickle.load(handle)
+
+        to_remove = []
+        for key in self.labelled_images.keys():
+            labeled_list = [j[0][0:-7] for j in self.labelled_images[key]]
+        for i in for_inference:
+            image_dir = '/'.join(i.split('/')[:-1])
+            to_remove = to_remove + [x for x in glob.glob(image_dir+'/*')
+                                     if '.json' in x  or '.bval' in x
+                                     or '.bvec' in x]
+#             if i[0:-7] not in labeled_list:
+#                 label_move_image(i[0:-7], 'Unclassifiable', image_dir)
+        for f in to_remove:
+            if os.path.isfile(f):
+                os.remove(f)
+
+        self.unclassifiable = [x for x in for_inference if x[0:-7] not in labeled_list]
+        for key in self.labelled_images.keys():
+            for cm in self.labelled_images[key]:
+                indices = [i for i, x in enumerate(cm[0]) if x == "/"]
+                dirName = os.path.join(output_dir, cm[0][indices[-3]+1:indices[-1]], key)
+                print(dirName)
+                create_move_toDir(cm[0], dirName, cm[1])
+
+
+        return runtime
+
+#     def _list_outputs(self):
+#         outputs = self._outputs().get()
+#         if isdefined(self.inputs.out_folder):
+#             outputs['labelled_images'] = self.labelled_images
+#             outputs['unclassifiable'] = self.unclassifiable
+# 
+#         return outputs
+    def _list_outputs(self):
+        outputs = self._outputs().get()
+        if isdefined(self.inputs.out_folder):
+            outputs['out_folder'] = os.path.abspath(
+                self.inputs.out_folder)
+
+        return outputs
+

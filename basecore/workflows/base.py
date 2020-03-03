@@ -22,9 +22,7 @@ class BaseWorkflow(BaseDatabase):
     def workflow_setup(self):
         return self.workflow()
 
-    def runner(self, cores=0):
-
-        workflow = self.workflow_setup()
+    def runner(self, workflow, cores=0):
 
         if cores == 0:
             print('Workflow will run linearly')

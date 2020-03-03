@@ -2,17 +2,19 @@ from .base import BaseConverter
 import subprocess as sp
 import os
 import glob
+import shutil
 
 
 class DicomConverter(BaseConverter):
     
-    def convert(self, convert_to='nifti_gz', method='dcm2niix', force=False):
+    def convert(self, convert_to='nifti_gz', method='dcm2niix', force=False,
+                rename_dicom=False):
 
         if convert_to == 'nrrd':
             print('\nConversion from DICOM to NRRD...')
             ext = '.nrrd'
             if method=='dcm2niix':
-                cmd = ("dcm2niix -o {0} -f {1} -e y {2}".format(self.basedir, self.filename, self.basedir))
+                cmd = ("dcm2niix -o '{0}' -f {1} -e y '{2}'".format(self.basedir, self.filename, self.basedir))
             elif method=='slicer':
                 cmd = (('Slicer --no-main-window --python-code '+'"node=slicer.util.loadVolume('+
                     "'{0}', returnNode=True)[1]; slicer.util.saveNode(node, '{1}'); exit()"+'"')
@@ -30,10 +32,10 @@ class DicomConverter(BaseConverter):
             ext = '.nii.gz'
             if method == 'dcm2niix':
                 if force:
-                    cmd = ("dcm2niix -o {0} -f {1} -z y -p n -m y {2}".format(self.basedir, self.filename,
+                    cmd = ("dcm2niix -o '{0}' -f {1} -z y -p n -m y '{2}'".format(self.basedir, self.filename,
                                                                          self.toConvert))
                 else:
-                    cmd = ("dcm2niix -o {0} -f {1} -z y -p n {2}".format(self.basedir, self.filename,
+                    cmd = ("dcm2niix -o '{0}' -f {1} -z y -p n '{2}'".format(self.basedir, self.filename,
                                                                          self.toConvert))
             else:
                 raise Exception('Not recognized {} method to convert from DICOM to NIFTI_GZ.'.format(method))
@@ -43,9 +45,9 @@ class DicomConverter(BaseConverter):
             ext = '.nii'
             if method == 'dcm2niix':
                 if force:
-                    cmd = ("dcm2niix -o {0} -f {1} -p n -m y {2}".format(self.basedir, self.filename, self.toConvert))
+                    cmd = ("dcm2niix -o '{0}' -f {1} -p n -m y '{2}'".format(self.basedir, self.filename, self.toConvert))
                 else:    
-                    cmd = ("dcm2niix -o {0} -f {1} -p n {2}".format(self.basedir, self.filename, self.toConvert))
+                    cmd = ("dcm2niix -o '{0}' -f {1} -p n '{2}'".format(self.basedir, self.filename, self.toConvert))
             else:
                 raise Exception('Not recognize {} method to convert from DICOM to NIFTI.'.format(method))
         else:
@@ -55,11 +57,21 @@ class DicomConverter(BaseConverter):
             sp.check_output(self.bin_path+cmd, shell=True)
             if self.clean:
                 self.clean_dir()
+            if rename_dicom:
+                # needed for MRCLASS
+                file = [item for item in os.listdir(self.basedir) if '.nii.gz' in item]
+                for f in file:
+                    if self.filename in f:
+                        outname = os.path.join(self.basedir, f)
+                        shutil.move(self.toConvert, outname[0:-7])
+                        break
             print('\nImage successfully converted!')
+            return os.path.join(self.basedir, self.filename)+ext
         except:
             print('Conversion failed. Scan will be ignored.')
+            return None
 
-        return os.path.join(self.basedir, self.filename)+ext
+        
 
     def clean_dir(self):
 

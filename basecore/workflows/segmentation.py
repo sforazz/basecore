@@ -94,6 +94,7 @@ class TumorSegmentation(BaseWorkflow):
         if hd_glio:
             tumor_seg  = nipype.MapNode(interface=HDGlioPredict(),
                                         iterfield=['t1', 'ct1', 't2', 'flair'],
+                                        serial=True,
                                         name='tumor_segmentation')
             tumor_seg.inputs.out_file = 'segmentation'
     
@@ -105,12 +106,12 @@ class TumorSegmentation(BaseWorkflow):
                                            name='gtv_seg_data_prep')
     
         gtv_seg = nipype.MapNode(interface=NNUnetInference(), iterfield=['input_folder'],
-                                 name='gtv_segmentation')
+                                 name='gtv_segmentation', serial=True)
         gtv_seg.inputs.model_folder = gtv_model
         gtv_seg.inputs.prefix = 'gtv'
     
         tumor_seg_2mods = nipype.MapNode(interface=NNUnetInference(), iterfield=['input_folder'],
-                                 name='tumor_seg_2mods')
+                                 name='tumor_seg_2mods', serial=True)
         tumor_seg_2mods.inputs.model_folder = tumor_model
         tumor_seg_2mods.inputs.prefix = 'tumor_2mod'
     

@@ -19,7 +19,8 @@ class BETWorkflow(BaseWorkflow):
         sessions = self.sessions
         nipype_cache = self.nipype_cache
 
-        bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'], name='bet')
+        bet = nipype.MapNode(interface=HDBet(), iterfield=['input_file'],
+                             name='bet', serial=True)
         bet.inputs.save_mask = 1
         bet.inputs.out_file = '{}_preproc'.format(ref_sequence.upper())
         
