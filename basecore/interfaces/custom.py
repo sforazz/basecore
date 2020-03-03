@@ -436,8 +436,8 @@ class MRClass(BaseInterface):
             #if key =='DIFF' or key=='T1' or key=='T2':
             if key == 'T1' or key == 'DIFF':
                 del labeled_images[key]
-#  
-#         self.labelled_images = {**labeled_subImages, **labeled_images}
+
+        self.labelled_images = {**labeled_subImages, **labeled_images}
 #         with open('/home/fsforazz/ww.pickle', 'wb') as f:
 #             pickle.dump(self.labelled_images, f, protocol=pickle.HIGHEST_PROTOCOL)
 #          
