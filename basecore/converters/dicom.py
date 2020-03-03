@@ -65,8 +65,10 @@ class DicomConverter(BaseConverter):
                         outname = os.path.join(self.basedir, f)
                         shutil.move(self.toConvert, outname[0:-7])
                         break
+            else:
+                outname = os.path.join(self.basedir, self.filename)+ext
             print('\nImage successfully converted!')
-            return os.path.join(self.basedir, self.filename)+ext
+            return outname
         except:
             print('Conversion failed. Scan will be ignored.')
             return None
