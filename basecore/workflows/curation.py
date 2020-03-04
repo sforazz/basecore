@@ -1,7 +1,7 @@
 import nipype
 import os
 from basecore.interfaces.utils import DicomCheck, ConversionCheck, GetRefRTDose,\
-    CreateSubjectsList, FileCheck, FolderMerge
+     FileCheck, FolderMerge
 from nipype.interfaces.dcm2nii import Dcm2niix
 from basecore.interfaces.plastimatch import DoseConverter
 from basecore.workflows.base import BaseWorkflow
@@ -33,10 +33,11 @@ class DataCuration(BaseWorkflow):
 
 #         prep = nipype.Node(interface=FolderPreparation(), name='prep')
 #         prep.inputs.input_dir = self.base_dir
-        create_list = nipype.Node(interface=CreateSubjectsList(), name='cl')
-        create_list.inputs.input_dir = self.base_dir
-        file_check = nipype.MapNode(interface=FileCheck(), iterfield=['input_file'],
+#         create_list = nipype.Node(interface=CreateSubjectsList(), name='cl')
+#         create_list.inputs.input_dir = self.base_dir
+        file_check = nipype.MapNode(interface=FileCheck(), iterfield=['input_dir'],
                                     name='fc', serial=True)
+        file_check.inputs.input_dir = self.base_dir
         file_check.inputs.subject_name_position = subject_name_position
         file_check.inputs.renaming = renaming
         prep = nipype.Node(interface=FolderPreparation(), name='prep')
@@ -53,7 +54,7 @@ class DataCuration(BaseWorkflow):
         mr_rt_merge.inputs.ravel_inputs = True
         merging = nipype.Node(interface=FolderMerge(), name='merge')
 
-        workflow.connect(create_list, 'file_list', file_check, 'input_file')
+#         workflow.connect(create_list, 'file_list', file_check, 'input_file')
         workflow.connect(file_check, 'out_list', prep, 'input_list')
         workflow.connect(prep, 'out_folder', sort, 'input_dir')
         workflow.connect(sort, 'out_folder', rt_sorting, 'input_dir')

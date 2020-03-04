@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from basecore.utils.torch import (
     resize_2Dimage, ZscoreNormalization, ToTensor,
     load_checkpoint, MRClassifierDataset_test)
-from basecore.utils.filemanip import label_move_image, create_move_toDir
+from basecore.utils.filemanip import create_move_toDir
 import json
 import pickle
 
@@ -352,8 +352,8 @@ class MRClass(BaseInterface):
         output_dir = os.path.abspath(self.inputs.out_folder)
 
         th = {'ADC':2,'DIFF':2,'T1':2,'T2':2,'FLAIR':2,'ADC':2,'SWI':2}
-        device = "cpu"
-#         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#         device = "cpu"
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         labeled, labeled_images = defaultdict(list), defaultdict(list)
         modalities = ['DIFF','T2','T1']
