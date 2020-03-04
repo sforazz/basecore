@@ -245,7 +245,7 @@ def dcm_check(dicoms, im_types, series_nums):
     return [str(x) for x in dcms]
 
 
-def decompress_dicom(self, dicom):
+def decompress_dicom(dicom):
     
     cmd = ("gdcmconv --raw {0} {1} ".format(dicom, dicom))
     sp.check_output(cmd, shell=True) 

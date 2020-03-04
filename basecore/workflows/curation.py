@@ -35,12 +35,13 @@ class DataCuration(BaseWorkflow):
 #         prep.inputs.input_dir = self.base_dir
 #         create_list = nipype.Node(interface=CreateSubjectsList(), name='cl')
 #         create_list.inputs.input_dir = self.base_dir
-        file_check = nipype.MapNode(interface=FileCheck(), iterfield=['input_dir'],
-                                    name='fc', serial=True)
+        file_check = nipype.Node(interface=FileCheck(),
+                                    name='fc')
         file_check.inputs.input_dir = self.base_dir
         file_check.inputs.subject_name_position = subject_name_position
         file_check.inputs.renaming = renaming
-        prep = nipype.Node(interface=FolderPreparation(), name='prep')
+        prep = nipype.MapNode(interface=FolderPreparation(), name='prep',
+                              iterfield=['input_list'])
         sort = nipype.MapNode(interface=FolderSorting(), name='sort',
                               iterfield=['input_dir'])
         mrclass = nipype.MapNode(interface=MRClass(), name='mrclass',

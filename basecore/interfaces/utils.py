@@ -16,6 +16,10 @@ import re
 from collections import defaultdict
 from nipype.interfaces.base import isdefined
 from basecore.converters.dicom import DicomConverter
+from . import logging
+
+
+iflogger = logging.getLogger('nipype.interface')
 
 
 RT_NAMES = ['RTSTRUCT', 'RTDOSE', 'RTPLAN', 'RTCT']
@@ -167,11 +171,13 @@ class ConversionCheck(BaseInterface):
                     im2save = nib.Nifti1Image(data[:, :, :, 0], affine=ref.affine)
                     nib.save(im2save, self.converted)
                 elif len(data.dtype) > 0:
-                    print('{} is not a greyscale image. It will be deleted.'.format(self.converted))
+                    iflogger.info('{} is not a greyscale image. It will'
+                                  ' be deleted.'.format(self.converted))
                     if os.path.isfile(self.converted):
                         self.converted = None
             except:
-                print('{} failed to save with nibabel. It will be deleted.'.format(self.converted))
+                iflogger.info('{} failed to save with nibabel. '
+                              'It will be deleted.'.format(self.converted))
                 if os.path.isfile(self.converted):
                     self.converted = None
         else:
@@ -373,7 +379,7 @@ class GetRefRTDose(BaseInterface):
         if dcms and len(dcms)==1: 
             dose_file = dcms[0]
         elif dcms and len(dcms) > 1: 
-            print('More than one dose file') 
+            iflogger.info('More than one dose file') 
             processed = False 
             for dcm in dcms: 
                 hd = pydicom.read_file(dcm) 
@@ -383,7 +389,7 @@ class GetRefRTDose(BaseInterface):
                     processed = True 
                     break 
             if not processed:
-                print('No PLAN in any dose file')
+                iflogger.info('No PLAN in any dose file')
                 dose_file = dcms[0]
         self.dose_file = dose_file
         return runtime
@@ -424,6 +430,7 @@ class FileCheck(BaseInterface):
 
         input_dir = self.inputs.input_dir
         renaming = self.inputs.renaming
+        out_list = []
         if not renaming:
             sub_name_position = self.inputs.subject_name_position
 
@@ -435,12 +442,11 @@ class FileCheck(BaseInterface):
             for f in files:
                 if '.dcm' in f:
                     filename = os.path.join(path, f)
-                    print('Process number: {}\n File: {}'.format(z, filename))
-                    print()
+                    iflogger.info('Process number: {}\n File: {}'.format(z, filename))
                     try:
                         ds = pydicom.dcmread(filename, force = True)
                     except:
-                        print('{} could not be read, dicom '
+                        iflogger.info('{} could not be read, dicom '
                               'file may be corrupted'.format(filename))
                     try:
                         seriesDescription=ds.SeriesDescription.upper().replace('_','')
@@ -465,7 +471,7 @@ class FileCheck(BaseInterface):
                         try:
                             patient_names[key].append(ds.PatientID)
                         except AttributeError:
-                            print('No patient ID for {}'.format(filename))
+                            iflogger.info('No patient ID for {}'.format(filename))
                             patient_names[key].append('Corrupted')
                     else:
                         sub_name = filename.split('/')[sub_name_position]
@@ -473,11 +479,29 @@ class FileCheck(BaseInterface):
                     try:
                         scan_dates[key].append(ds.StudyDate)
                     except:
-                        print('No study date for {}'.format(filename))
+                        iflogger.info('No study date for {}'.format(filename))
                         scan_dates[key].append('Corrupted')
                     z += 1
-
-        self.out_list = [scans, patient_names, scan_dates]
+        names = [patient_names[x][0] for x in patient_names.keys()]
+        scans_tot = []
+        pn_tot = []
+        sd_tot = []
+        for s in set(names):
+            temp_scan = {}
+            temp_pn = {}
+            temp_sd = {}
+            for key in patient_names.keys():
+                if patient_names[key][0] == s:
+                    temp_scan[key] = scans[key]
+                    temp_pn[key] = patient_names[key]
+                    temp_sd[key] = scan_dates[key]
+            out_list.append([temp_scan, temp_pn, temp_sd])
+#             scans_tot.append(temp_scan)
+#             pn_tot.append(temp_pn)
+#             sd_tot.append(temp_sd)
+        self.out_list = out_list
+#         self.out_list = [scans, patient_names, scan_dates]
+#         self.out_list = [scans_tot, pn_tot, sd_tot]
 
         return runtime
 
@@ -625,9 +649,8 @@ class FolderPreparationInputSpec(BaseInterfaceInputSpec):
 
 class FolderPreparationOutputSpec(TraitedSpec):
     
-    out_folder = traits.List(desc='Prepared folder.')
-    subject_names = traits.List(desc='Prepared folder.')
-#     out_folder = Directory(exists=True, desc='Prepared folder.')
+#     out_folder = traits.List(desc='Prepared folder.')
+    out_folder = Directory(exists=True, desc='Prepared folder.')
 
 
 class FolderPreparation(BaseInterface):
@@ -640,9 +663,9 @@ class FolderPreparation(BaseInterface):
         input_list = self.inputs.input_list
         output_dir = os.path.abspath(self.inputs.out_folder)
         
-        scans = input_list[0][0]
-        patient_names = input_list[0][1]
-        scan_dates = input_list[0][2]
+        scans = input_list[0]
+        patient_names = input_list[1]
+        scan_dates = input_list[2]
 #         scans = defaultdict(list)
 #         patient_names = defaultdict(list)
 #         scan_dates = defaultdict(list)
@@ -672,11 +695,11 @@ class FolderPreparation(BaseInterface):
     def _list_outputs(self):
         outputs = self._outputs().get()
         if isdefined(self.inputs.out_folder):
-            outputs['out_folder'] = sorted(glob.glob(os.path.abspath(
-                self.inputs.out_folder+'/*')))
-            outputs['subject_names'] = [
-                x.split('/')[-1] for x in sorted(glob.glob(os.path.abspath(
-                self.inputs.out_folder+'/*')))]
+            outputs['out_folder'] = os.path.abspath(
+                self.inputs.out_folder)
+#         if isdefined(self.inputs.out_folder):
+#             outputs['out_folder'] = sorted(glob.glob(os.path.abspath(
+#                 self.inputs.out_folder+'/*')))
 
         return outputs
 
@@ -707,7 +730,7 @@ class FolderSorting(BaseInterface):
 
         modality_List = ['RTDOSE','CT','RTSTRUCT','RTPLAN', 'PET']
         
-        images=glob.glob(input_dir+'/*/*')
+        images=glob.glob(input_dir+'/*/*/*')
         for_inference=[]
 
         for i in images:
@@ -742,7 +765,7 @@ class FolderSorting(BaseInterface):
                         for_inference.append(nifti_image)
                     else:
                         label_move_image(i, 'error_converting', out_dir)
-                        print('Error converting',str(new_image))
+                        iflogger.info('Error converting', str(new_image))
             else:
                 label_move_image(i, 'Unknown_modality', out_dir)
         self.for_inference = for_inference
@@ -785,14 +808,14 @@ class FolderMerge(BaseInterface):
             mr_dir = directories[0]
             rt_dir = directories[1]
             if not os.path.isdir(mr_dir):
-                print('No MRI data found')
+                iflogger.info('No MRI data found')
                 mr_tocopy = []
                 mr_sub_name = None
             else:
                 mr_sub_name = os.listdir(mr_dir)[0]
                 mr_tocopy = sorted(glob.glob(os.path.join(mr_dir, mr_sub_name, '*')))
             if not os.path.isdir(rt_dir):
-                print('No RT or CT data found')
+                iflogger.info('No RT or CT data found')
                 rt_tocopy = []
                 rt_sub_name = None
             else:
