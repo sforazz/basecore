@@ -2,6 +2,8 @@ import os
 import json
 import subprocess as sp
 import collections
+import copy
+import pickle
 
 
 class ClusterDatabase():
@@ -60,10 +62,10 @@ class ClusterDatabase():
         
     def check_precomputed_outputs(self, basepath, outfields, sessions, sub_id):
         
-        cmd = 'rsync -rtvu {0}/database.json {1}'.format(self.myserver, basepath)
+        cmd = 'rsync -rtvu {0}/database.pickle {1}'.format(self.myserver, basepath)
         self.run_rsync(cmd, ignore_error=True)
         
-        database = self.load_database(os.path.join(basepath, 'database.json'))
+        database = self.load_database(os.path.join(basepath, 'database.pickle'))
         to_process = []
         if database is not None:
             sub_db = database[sub_id]
@@ -79,7 +81,7 @@ class ClusterDatabase():
         
         basepath, folder_name = os.path.split(sub_folder)
 
-        cmd = 'rsync -rtvu {0}/database.json {1}'.format(self.myserver, basepath)
+        cmd = 'rsync -rtvu {0}/database.pickle {1}'.format(self.myserver, basepath)
         self.run_rsync(cmd, ignore_error=True)
 
         database = dict()
@@ -89,6 +91,7 @@ class ClusterDatabase():
 
         for element in scans:
             _, sess, scan = element.split('/')
+#             database[folder_name][sess] = dict()
             scan_name = scan.split('.')[0].lower()
             database[folder_name][sess][scan_name] = element
 
@@ -96,7 +99,7 @@ class ClusterDatabase():
         with open(scan_file, 'w') as f:
             for el in scans:
                 f.write(el+'\n')
-            f.write('database.json')
+            f.write('database.pickle')
 
         self.update_database(basepath, database, folder_name)
 
@@ -108,10 +111,10 @@ class ClusterDatabase():
 
         if not os.path.isdir(cache_dir):
             os.mkdir(cache_dir)
-        cmd = 'rsync -rtvu {0}/database.json {1}'.format(self.myserver, cache_dir)
+        cmd = 'rsync -rtvu {0}/database.pickle {1}'.format(self.myserver, cache_dir)
         self.run_rsync(cmd)
 
-        database = self.load_database(os.path.join(cache_dir, 'database.json'))
+        database = self.load_database(os.path.join(cache_dir, 'database.pickle'))
         to_get = []
         for sub_id in subjects:
             if sub_id in database.keys():
@@ -138,8 +141,8 @@ class ClusterDatabase():
     def load_database(self, db_path):
 
         if os.path.isfile(db_path):
-            with open(db_path, 'r') as f:
-                database = json.load(f)
+            with open(db_path, 'rb') as f:
+                database = pickle.load(f)
         else:
             database = None
         
@@ -147,17 +150,19 @@ class ClusterDatabase():
 
     def update_database(self, basepath, new_db, folder_name):
 
-        database = self.load_database(os.path.join(basepath, 'database.json'))
+        database = self.load_database(os.path.join(basepath, 'database.pickle'))
 
         if database is not None:
             if folder_name not in database.keys():
                 database[folder_name] = collections.defaultdict(dict)
-            database[folder_name].update(new_db[folder_name])
+            for session_name in new_db[folder_name].keys():
+                database[folder_name][session_name].update(
+                    new_db[folder_name][session_name])
         else:
-            database = new_db
+            database = copy.deepcopy(new_db)
         
-        with open(os.path.join(basepath, 'database.json'), 'w') as f:
-            json.dump(database, f)
+        with open(os.path.join(basepath, 'database.pickle'), 'wb') as f:
+            pickle.dump(database, f)
 
     def run_rsync(self, cmd, ignore_error=False):
 
@@ -170,10 +175,10 @@ class ClusterDatabase():
 
     def get_subject_list(self, basepath):
 
-        cmd = 'rsync -rtvu {0}/database.json {1}'.format(self.myserver, basepath)
+        cmd = 'rsync -rtvu {0}/database.pickle {1}'.format(self.myserver, basepath)
         self.run_rsync(cmd, ignore_error=True)
         
-        database = self.load_database(os.path.join(basepath, 'database.json'))
+        database = self.load_database(os.path.join(basepath, 'database.pickle'))
         if database is not None:
             sub_list = list(database.keys())
         else:
