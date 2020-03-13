@@ -4,6 +4,8 @@ from basecore.interfaces.mitk import Voxelizer
 from basecore.interfaces.utils import CheckRTStructures
 from basecore.interfaces.pyradiomics import FeatureExtraction
 from basecore.workflows.base import BaseWorkflow
+import os
+from nipype.interfaces.utility import Merge
 
 
 class RadiomicsWorkflow(BaseWorkflow):
@@ -14,7 +16,7 @@ class RadiomicsWorkflow(BaseWorkflow):
         self.regex = regex
         self.roi_selection = roi_selection
 
-    def datasource(self):
+    def datasource(self, modality='ct', **kwargs):
 
         self.database()
         rt = self.rt
@@ -35,18 +37,41 @@ class RadiomicsWorkflow(BaseWorkflow):
         
         field_template = dict()
         template_args = dict()
-        if rt_dose is not None:
-            field_template['rt_dose'] = '%s/%s/{}'.format(rt_dose)
-            template_args['rt_dose'] = [['sub_id', 'rt']]
-
-        field_template['rtct_nifti'] = '%s/%s/RTCT.nii.gz'
-        template_args['rtct_nifti'] = [['sub_id', 'rt']]
-        
-        field_template['rts_dcm'] = '%s/%s/RTSTRUCT_used/*dcm'
-        template_args['rts_dcm'] = [['sub_id', 'rt']]
-
-        field_template['rois'] = '%s/%s/out_struct*'
-        template_args['rois'] = [['sub_id', 'rt']]
+        if modality == 'ct':
+            if rt_dose is not None:
+                field_template['rt_dose'] = '%s/%s/{}'.format(rt_dose)
+                template_args['rt_dose'] = [['sub_id', 'rt']]
+    
+            field_template['rtct_nifti'] = '%s/%s/RTCT.nii.gz'
+            template_args['rtct_nifti'] = [['sub_id', 'rt']]
+            
+            field_template['rts_dcm'] = '%s/%s/RTSTRUCT_used/*dcm'
+            template_args['rts_dcm'] = [['sub_id', 'rt']]
+    
+            field_template['rois'] = '%s/%s/out_struct*'
+            template_args['rois'] = [['sub_id', 'rt']]
+        elif modality == 'mri':
+            for key, value in kwargs.items():
+                if key == 'rois':
+                    for roi in value:
+                        if not roi.endswith('.nii.gz'):
+                            roi_name = roi.lower()
+                            ext = '.nii.gz'
+                        else:
+                            roi_name = roi.split('.nii.gz')[0].lower()
+                            ext = ''
+                        field_template[roi_name] = '%s/%s/{0}{1}'.format(roi, ext)
+                        template_args[roi_name] = [['sub_id', 'sessions']]
+                elif key == 'images':
+                    for image in value:
+                        if not image.endswith('.nii.gz'):
+                            image_name = image.lower()
+                            ext = '.nii.gz'
+                        else:
+                            image_name = image.split('.nii.gz')[0].lower()
+                            ext = ''
+                        field_template[image_name] = '%s/%s/{0}{1}'.format(image, ext)
+                        template_args[image_name] = [['sub_id', 'sessions']]
         
         field_template.update(self.field_template)
         template_args.update(self.template_args)
@@ -55,9 +80,12 @@ class RadiomicsWorkflow(BaseWorkflow):
         self.template_args = template_args
 
         if self.xnat_source:
-            self.xnat_scan_ids = list(set([self.field_template[it].split('/')[-1].split('.')[0]
+            self.input_needed = list(set([self.field_template[it].split('/')[-1].split('.')[0]
                                       for it in self.field_template]))
             self.xnat_datasource()
+        elif self.cluster_source:
+            self.input_needed = self.outfields[:]
+            self.cluster_datasource()
 
         self.data_source = self.create_datasource()
 
@@ -153,11 +181,61 @@ class RadiomicsWorkflow(BaseWorkflow):
         workflow = self.datasink(workflow, datasink)
     
         return workflow
+
+    def mri_features_extraction(self, rois=[], images=[]):
+
+        self.datasource(modality='mri', rois=rois, images=images)
+
+        datasource = self.data_source
+        nipype_cache = self.nipype_cache
+        result_dir = self.result_dir
+        sub_id = self.sub_id
+#         sessions = self.sessions
+
+        workflow = nipype.Workflow('features_extraction_workflow', base_dir=nipype_cache)
     
-    def workflow_setup(self, ct_feat_ext=False):
+        datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
+        substitutions = [('subid', sub_id)]
+        substitutions += [('results/', '{}/'.format(self.workflow_name))]
+
+        for image in images:
+            if not image.endswith('.nii.gz'):
+                image_name = image.lower()
+            else:
+                image_name = image.split('.nii.gz')[0].lower()
+            for roi in rois:
+                if not roi.endswith('.nii.gz'):
+                    roi_name = roi.lower()
+                else:
+                    roi_name = roi.split('.nii.gz')[0].lower()
+                features = nipype.MapNode(interface=FeatureExtraction(),
+                                          iterfield=['input_image', 'rois'],
+                                          name='features_extraction_{}{}'.format(image_name, roi_name))
+                features.inputs.parameter_file = '/home/fsforazz/git/core/resources/Params_MR.yaml'
+                workflow.connect(datasource, image_name, features, 'input_image')
+                workflow.connect(datasource, roi_name, features, 'rois')
+                workflow.connect(features, 'feature_files', datasink,
+                                 'results.subid.@csv_file_{}{}'.format(image_name, roi_name))
+    
+                for i, session in enumerate(self.sessions):
+                    substitutions += [('_features_extraction_{0}{1}{2}/'
+                                       .format(image_name, roi_name, i),
+                                       session+'/')]
+
+        datasink.inputs.substitutions =substitutions
+
+        workflow = self.datasink(workflow, datasink)
+    
+        return workflow
+
+    def workflow_setup(self, ct_feat_ext=False, feat_ext=False, **kwargs):
 
         if ct_feat_ext:
             workflow = self.ref_ct_features_extraction()
+        elif feat_ext:
+            images = kwargs['images']
+            rois = kwargs['rois']
+            workflow = self.mri_features_extraction(rois, images)
         else:
             workflow = self.workflow()
 

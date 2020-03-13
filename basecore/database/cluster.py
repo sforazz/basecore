@@ -175,6 +175,8 @@ class ClusterDatabase():
 
     def get_subject_list(self, basepath):
 
+        if not os.path.isdir(basepath):
+            os.makedirs(basepath)
         cmd = 'rsync -rtvu {0}/database.pickle {1}'.format(self.myserver, basepath)
         self.run_rsync(cmd, ignore_error=True)
         
