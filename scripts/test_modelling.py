@@ -33,71 +33,74 @@ def create_dict(csv_file, row_id, row_element):
 class BreakIt(Exception): pass
 
 
-input_dir = '/media/fsforazz/portable_hdd/data_sorted/GBM/GBM_sorted/'
-csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_2.csv'
-dict_training = create_dict(csv_file, 5, 9)
+# input_dir = '/media/fsforazz/portable_hdd/data_sorted/GBM/GBM_sorted/'
+# csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_2.csv'
+# dict_training = create_dict(csv_file, 5, 9)
+# 
+# csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_expanded.csv'
+# dict_age = create_dict(csv_file, 1, 8)
+# 
+# for sub_id in dict_training:
+#     del dict_age[sub_id]
+# 
+# dict_surgical = {}
+# subs_folder = list(set(sorted(glob.glob(input_dir+'/*/*'))))
+# no_imaging_data = []
+# for sub_id in dict_age:
+#     match = [x for x in subs_folder if sub_id in x]
+#     if match:
+#         try:
+#             for path, _, files in os.walk(match[0]):
+#                 for f in files:
+#                     if f.endswith('.dcm'):
+#                         hd = pydicom.read_file(os.path.join(path, f))
+#                         try:
+#                             birth_date = hd.PatientBirthDate
+#                             birth_date = dd.strptime(birth_date, '%Y%m%d')
+#                             age_days = int(float(dict_age[sub_id]) * 365)
+#                             surgical_date = birth_date + datetime.timedelta(days=age_days)
+#                             dict_surgical[sub_id] = surgical_date
+#                             raise BreakIt
+#                         except KeyError:
+#                             print('No birth date in this DICOM')
+#                         except ValueError:
+#                             print('Wrong date format')
+#                             raise BreakIt
+#         except BreakIt:
+#             pass
+#     else:
+#         no_imaging_data.append(sub_id)
+# 
+# dict_im_sessions = {}
+# for sub_id in dict_surgical:
+#     match = [x for x in subs_folder if sub_id in x]
+#     sessions = sorted(os.listdir(match[0]))
+#     surgical_date = dict_surgical[sub_id]
+#     for session in sessions:
+#         sess_date = dd.strptime(session, '%Y%m%d')
+#         if (sess_date-surgical_date).days > -30 and (sess_date-surgical_date).days < 0:
+#             scans = os.listdir(os.path.join(match[0], session))
+#             if 'T1KM' in scans and 'FLAIR' in scans:
+#                 dict_im_sessions[sub_id] = os.path.join(match[0], session)
+# wd = '/mnt/sdb/GBM_TP0_only_MR_validation'
+# for sub_id in dict_im_sessions:
+#     to_copy = dict_im_sessions[sub_id]
+#     sess_name = to_copy.split('/')[-1]
+#     dst = os.path.join(wd, sub_id, sess_name)
+#     if not os.path.isdir(dst):
+#         os.makedirs(dst)
+#     for im in ['T1KM', 'FLAIR']:
+#         shutil.copytree(os.path.join(to_copy, im),
+#                         os.path.join(dst, im))
 
-csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_expanded.csv'
-dict_age = create_dict(csv_file, 1, 8)
-
-for sub_id in dict_training:
-    del dict_age[sub_id]
-
-dict_surgical = {}
-subs_folder = list(set(sorted(glob.glob(input_dir+'/*/*'))))
-no_imaging_data = []
-for sub_id in dict_age:
-    match = [x for x in subs_folder if sub_id in x]
-    if match:
-        try:
-            for path, _, files in os.walk(match[0]):
-                for f in files:
-                    if f.endswith('.dcm'):
-                        hd = pydicom.read_file(os.path.join(path, f))
-                        try:
-                            birth_date = hd.PatientBirthDate
-                            birth_date = dd.strptime(birth_date, '%Y%m%d')
-                            age_days = int(float(dict_age[sub_id]) * 365)
-                            surgical_date = birth_date + datetime.timedelta(days=age_days)
-                            dict_surgical[sub_id] = surgical_date
-                            raise BreakIt
-                        except KeyError:
-                            print('No birth date in this DICOM')
-                        except ValueError:
-                            print('Wrong date format')
-                            raise BreakIt
-        except BreakIt:
-            pass
-    else:
-        no_imaging_data.append(sub_id)
-
-dict_im_sessions = {}
-for sub_id in dict_surgical:
-    match = [x for x in subs_folder if sub_id in x]
-    sessions = sorted(os.listdir(match[0]))
-    surgical_date = dict_surgical[sub_id]
-    for session in sessions:
-        sess_date = dd.strptime(session, '%Y%m%d')
-        if (sess_date-surgical_date).days > -30 and (sess_date-surgical_date).days < 0:
-            scans = os.listdir(os.path.join(match[0], session))
-            if 'T1KM' in scans and 'FLAIR' in scans:
-                dict_im_sessions[sub_id] = os.path.join(match[0], session)
-wd = '/mnt/sdb/GBM_TP0_only_MR_validation'
-for sub_id in dict_im_sessions:
-    to_copy = dict_im_sessions[sub_id]
-    sess_name = to_copy.split('/')[-1]
-    dst = os.path.join(wd, sub_id, sess_name)
-    if not os.path.isdir(dst):
-        os.makedirs(dst)
-    for im in ['T1KM', 'FLAIR']:
-        shutil.copytree(os.path.join(to_copy, im),
-                        os.path.join(dst, im))
-
-subs = [x for x in glob.glob('/mnt/sdb/GBM_TP0_only_MR_processed/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
+subs = [x for x in glob.glob('/mnt/sdb/GBM_TP0_only_MR_validation_processed/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
 csvs = [sorted(glob.glob(x+'/*/Features_pyradiomics_T1KM*'))[0] for x in subs]
 # csv = glob.glob('/mnt/sdb/GBM_TP0_MRI_only/workflows_output/RadiomicsWorkflow/*/*/Features_pyradiomics_*.csv')
 
 # sub_names = [x.split('/')[-3] for x in csv]
+csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_expanded.csv'
+mydict = create_dict(csv_file, 1, 5)
+mydict_s = create_dict(csv_file, 1, 6)
 
 features = []
 to_concat = []
@@ -116,7 +119,7 @@ for f in csvs:
 
 combined_csv = pd.concat(to_concat)
 # combined_csv = pd.concat([pd.read_csv(f) for f in csv])
-combined_csv.to_csv( "/mnt/sdb/GBM_TP0_only_MR_processed/workflows_output/RadiomicsWorkflow/combined_csv_new_parfile.csv", index=False, encoding='utf-8-sig')
+combined_csv.to_csv( "/mnt/sdb/GBM_TP0_only_MR_validation_processed/workflows_output/RadiomicsWorkflow/combined_csv_new_parfile.csv", index=False, encoding='utf-8-sig')
 # for i, csv_file in enumerate(csvs):
 #     db = pd.read_csv(csv_file)
 #     to_keep = [x for x in db.columns if 'diagnostic' not in x

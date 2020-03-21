@@ -13,7 +13,7 @@ import glob
 
 
 
-root_dir=r'/mnt/sdb/GBM_sorted_manually_part2/'
+root_dir=r'/mnt/sdb/GBM_TP0_only_MR_validation_processed/workflows_output/DataCuration/'
 
 
 def extract_middleSlice(image):
@@ -43,7 +43,7 @@ def smallest(num1, num2, num3):
 
 
 
-list_sub = glob.glob(root_dir+'/*/*/CT1.nii.gz')
+list_sub = glob.glob(root_dir+'/*/*/T1KM.nii.gz')
 z=0
 cnt=0
 
