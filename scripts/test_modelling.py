@@ -5,7 +5,7 @@ import glob
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import scale, normalize
-from gap_statistic import OptimalK
+# from gap_statistic import OptimalK
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn import manifold
@@ -16,7 +16,33 @@ import pydicom
 import datetime
 from datetime import datetime as dd
 import shutil
+import pickle
 
+
+def create_dict_cimp(csv_file, row_id, row_element):
+
+    with open(csv_file, mode='r') as infile:
+        reader = csv.reader(infile)
+        mydict = {}
+        for rows in reader:
+            sub_id = rows[row_id].strip().zfill(10) 
+            if rows[row_element] and sub_id not in list(mydict.keys()) and 'mutant' not in rows[17] and rows[row_element]!='NA':
+                if row_element == 18:
+                    if 'mesenchymal' in rows[row_element]:
+                        val = 0
+                    elif 'RTK' in rows[row_element] and 'II' in rows[row_element]:
+                        val = 1
+                    elif 'RTK' in rows[row_element] and 'I' in rows[row_element]:
+                        val = 2
+                    elif 'NP_GLIOMA' in rows[row_element]:
+                        val = 'NP_GLIOMA'
+                    else:
+                        val = 3
+                    mydict[sub_id] = val
+                else:
+                    mydict[sub_id] = rows[row_element]
+
+    return mydict
 
 def create_dict(csv_file, row_id, row_element):
 
@@ -25,14 +51,59 @@ def create_dict(csv_file, row_id, row_element):
         mydict = {}
         for rows in reader:
             sub_id = rows[row_id].strip().zfill(10) 
-            if rows[row_element] and sub_id not in list(mydict.keys()) and rows[row_element]!='NA':
+            if (rows[row_element] and sub_id not in list(mydict.keys()) and 
+                    ('glioblastoma' in rows[18] and
+                     ('mesenchymal' in rows[18] or 'RTK' in rows[18]))
+                    and rows[row_element]!='NA'):
+                if row_element == 18:
+                    if 'mesenchymal' in rows[row_element]:
+                        val = 0
+                    elif 'RTK' in rows[row_element] and 'II' in rows[row_element]:
+                        val = 1
+                    elif 'RTK' in rows[row_element] and 'I' in rows[row_element]:
+                        val = 2
+                    elif 'NP_GLIOMA' in rows[row_element]:
+                        val = 'NP_GLIOMA'
+                    else:
+                        val = 3
+                    mydict[sub_id] = val
+                else:
+                    mydict[sub_id] = rows[row_element]
+
+    return mydict
+
+
+def create_dict2(csv_file, row_id, row_element):
+
+    with open(csv_file, mode='r') as infile:
+        reader = csv.reader(infile)
+        mydict = {}
+        for rows in reader:
+            sub_id = rows[row_id].strip().zfill(10) 
+            if rows[row_element] and sub_id not in list(mydict.keys()):
                 mydict[sub_id] = rows[row_element]
 
     return mydict
 
 class BreakIt(Exception): pass
 
-
+wanted = ['T1KM', 'ADC', 'T2', 'T1', 'SWI']
+work_dir = ''
+with open('filename', 'rb') as f:
+    data_dict = pickle.load(f)
+input_dir = '/media/fsforazz/portable_hdd/data_sorted/GBM/GBM_sorted/'
+subs_folder = list(set(sorted(glob.glob(input_dir+'/*/*'))))
+for sub_id in data_dict:
+    match = [x for x in subs_folder if sub_id in x][0]
+    sessions = data_dict[sub_id]
+    for session in sessions:
+        if not os.path.isdir(os.path.join(work_dir, sub_id, session)):
+            os.makedirs(os.path.join(work_dir, sub_id, session))
+        sess_path = os.path.join(match, session)
+        scans = [x for x in os.listdir(sess_path) if x in wanted]
+        for scan in scans:
+            tocopy = os.path.join(sess_path, scan)
+            shutil.copytree(tocopy, os.path.join(work_dir, sub_id, session, scan))
 # input_dir = '/media/fsforazz/portable_hdd/data_sorted/GBM/GBM_sorted/'
 # csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_2.csv'
 # dict_training = create_dict(csv_file, 5, 9)
@@ -93,14 +164,31 @@ class BreakIt(Exception): pass
 #         shutil.copytree(os.path.join(to_copy, im),
 #                         os.path.join(dst, im))
 
-subs = [x for x in glob.glob('/mnt/sdb/GBM_TP0_only_MR_validation_processed/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
-csvs = [sorted(glob.glob(x+'/*/Features_pyradiomics_T1KM*'))[0] for x in subs]
+subs1 = [x for x in glob.glob('/home/fsforazz/Desktop/GBM_TP0_only_MR/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
+subs2 = [x for x in glob.glob('/home/fsforazz/Desktop/GBM_TP0_only_MR_validation_features/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
+subs = subs1+subs2
+# subs = [x for x in glob.glob('/home/fsforazz/Desktop/GBM_data_ICA_modelling_features/GBM_TP0_validation/workflows_output/RadiomicsWorkflow/*') if os.path.isdir(x)]
+csvs = [sorted(glob.glob(x+'/*/Features_pyradiomics_FLAIR_preproc_N4_zscore_GTV_predicted.csv'))[0] for x in subs]
 # csv = glob.glob('/mnt/sdb/GBM_TP0_MRI_only/workflows_output/RadiomicsWorkflow/*/*/Features_pyradiomics_*.csv')
 
 # sub_names = [x.split('/')[-3] for x in csv]
-csv_file = '/run/user/1000/gvfs/smb-share:server=ad,share=fs/E210-Projekte/Projects/Radiomics/patientData/glioma/metadata_20200128_expanded.csv'
+csv_file = '/home/fsforazz/Documents/glioma/metadata_20200128_expanded_np_glioma.csv'
+csv_file2 = '/home/fsforazz/Documents/glioma/missing_ica_20200331_filled.csv'
 mydict = create_dict(csv_file, 1, 5)
+# mydict1 = create_dict2(csv_file2, 2, 9)
+# mydict.update(mydict1)
 mydict_s = create_dict(csv_file, 1, 6)
+# mydict_s1 = create_dict2(csv_file2, 2, 10)
+# mydict_s.update(mydict_s1)
+mydict_pv = create_dict(csv_file, 1, 2)
+mydict_mgmt = create_dict(csv_file, 1, 14)
+mydict_mgmt_hd = create_dict(csv_file, 1, 13)
+mydict_pdl1 = create_dict(csv_file, 1, 19)
+mydict_pd1 = create_dict(csv_file, 1, 20)
+mydict_age = create_dict(csv_file, 1, 8)
+mydict_sex = create_dict(csv_file, 1, 9)
+mydict_svz = create_dict(csv_file, 1, 11)
+mydict_npglio = create_dict(csv_file, 1, 18)
 
 features = []
 to_concat = []
@@ -109,17 +197,37 @@ for f in csvs:
     sub_id = f.split('/')[-3]
     db = pd.read_csv(f)
     db['PID'] = sub_id
-    db['TIME'] = mydict[sub_id]
-    db['STATUS'] = mydict_s[sub_id]
-    db = db[[c for c in db if c in ['PID', 'TIME', 'STATUS']]+
-            [c for c in db if c not in ['PID', 'TIME', 'STATUS']
-             and 'diagnostic' not in c
-             and 'Subject' not in c and 'Mask' not in c]]
-    to_concat.append(db)
+    try:
+        db['TIME'] = mydict[sub_id]
+        db['STATUS'] = mydict_s[sub_id]
+        db['PROGNOSIS'] = mydict_pv[sub_id]
+        db['MGMT'] = mydict_mgmt[sub_id]
+        db['MGMT_HD'] = mydict_mgmt_hd[sub_id]
+        db['PDL1'] = mydict_pdl1[sub_id]
+        db['PD1'] = mydict_pd1[sub_id]
+        db['AGE'] = mydict_age[sub_id]
+        db['SEX'] = mydict_sex[sub_id]
+        db['NP_GLIOMA'] = mydict_npglio[sub_id]
+        db['SVZ'] = mydict_svz[sub_id]
+        db = db[[c for c in db if c in ['PID', 'TIME', 'STATUS', 'PROGNOSIS', 'MGMT', 'MGMT_HD',
+                                        'PDL1', 'PD1', 'AGE', 'SEX', 'SVZ', 'NP_GLIOMA']]+
+                [c for c in db if c not in ['PID', 'TIME', 'STATUS', 'PROGNOSIS', 'MGMT', 'MGMT_HD',
+                                        'PDL1', 'PD1', 'AGE', 'SEX', 'SVZ', 'NP_GLIOMA']
+                 and 'diagnostic' not in c
+                 and 'Subject' not in c and 'Mask' not in c]]
+#         db = db[[c for c in db if c in ['PID', 'TIME', 'STATUS']]+
+#                 [c for c in db if c not in ['PID', 'TIME', 'STATUS']
+#                  and 'diagnostic' not in c
+#                  and 'Subject' not in c and 'Mask' not in c]]
+        to_concat.append(db)
+    except KeyError:
+        print('{} probably mutant?'.format(sub_id))
 
 combined_csv = pd.concat(to_concat)
 # combined_csv = pd.concat([pd.read_csv(f) for f in csv])
-combined_csv.to_csv( "/mnt/sdb/GBM_TP0_only_MR_validation_processed/workflows_output/RadiomicsWorkflow/combined_csv_new_parfile.csv", index=False, encoding='utf-8-sig')
+combined_csv.to_csv('/home/fsforazz/Documents/survival_analysis_R'
+                    '/GBM_TP0_T1KM_GTV/combined_csv_npglio_FLAIR_BC_voxel_shift.csv',
+                    index=False, encoding='utf-8-sig')
 # for i, csv_file in enumerate(csvs):
 #     db = pd.read_csv(csv_file)
 #     to_keep = [x for x in db.columns if 'diagnostic' not in x
