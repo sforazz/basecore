@@ -8,7 +8,7 @@ from basecore.database.utils import check_cache
 from basecore.database.cluster import ClusterDatabase
 
 
-POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair']
+POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair', 'adc', 'swi']
 
 
 class BaseDatabase():
@@ -81,12 +81,12 @@ class BaseDatabase():
             ext = ''
         sequences = [x for x in sequences if x in POSSIBLE_SEQUENCES]
 #         sequences = list(set([x for y in POSSIBLE_SEQUENCES for x in sequences if y in x]))
-        if 't1' in sequences:
-            ref_sequence = 't1'
-        elif 'ct1' in sequences:
+        if 'ct1' in sequences:
             ref_sequence = 'ct1'
         elif 't1km' in sequences:
             ref_sequence = 't1km'
+        elif 't1' in sequences:
+            ref_sequence = 't1'
         elif ext == '':
             ref_sequence = []
         else:
@@ -228,7 +228,7 @@ class BaseDatabase():
                 field_template[seq] = '%s/%s/{0}{1}'.format(seq.upper(), ext)
             template_args[seq] = [['sub_id', 'sessions']]
         if t10:
-            field_template['t1_0'] = '%s/%s/T1{0}'.format(ext)
+            field_template['t1_0'] = '%s/%s/CT1{0}'.format(ext)
             template_args['t1_0'] = [['sub_id', 'ref_t1']]
             outfields.append('t1_0')
         if reference:
