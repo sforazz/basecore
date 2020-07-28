@@ -34,5 +34,5 @@ setup(name='basecore',
           'Topic :: Scientific/Engineering',
           'Operating System :: Unix'
       ],
-      scripts=['bash/predict_simple.py', 'bash/antsRegistrationSyN1.sh']
+      scripts=['bash/predict_simple.py', 'bash/antsRegistrationSyN1.sh', 'bash/dcm2niix']
       )

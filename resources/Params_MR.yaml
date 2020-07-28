@@ -43,8 +43,8 @@ featureClass:
 setting:
   # Normalization:
 
-  normalize: True
-  normalizeScale: 100  # This allows you to use more or less the same bin width.
+  #normalize: True
+  #normalizeScale: 100  # This allows you to use more or less the same bin width.
 
   # Resampling:
   interpolator: 'sitkBSpline'

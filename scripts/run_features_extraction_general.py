@@ -1,6 +1,7 @@
 "Script to run brain extraction using HD-BET"
 from basecore.workflows.radiomics import RadiomicsWorkflow
 from basecore.utils.config import cmdline_input_config, create_subject_list
+from basecore.utils.utils import check_data
 
 
 if __name__ == "__main__":
@@ -15,10 +16,15 @@ if __name__ == "__main__":
     ARGS = PARSER.parse_args()
 
     BASE_DIR = ARGS.input_dir
-
+    
+    image2process = 'CT1_preproc_N4_zscore'
+    mask2process = ['GTV_predicted']
+    
+    subjecs_to_process = check_data(BASE_DIR, image2process, masks=mask2process)
+    print(len(subjecs_to_process))
     sub_list, BASE_DIR = create_subject_list(BASE_DIR, ARGS.xnat_source,
                                              ARGS.cluster_source,
-                                             subjects_to_process=[])
+                                             subjects_to_process=subjecs_to_process)
 
     for sub_id in sub_list:
 
@@ -32,8 +38,8 @@ if __name__ == "__main__":
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
             cluster_project_id=ARGS.cluster_project_id)
 
-        wf = workflow.workflow_setup(feat_ext=True, images=['FLAIR_preproc', 'T1KM_preproc'],
-                                     rois=['GTV_predicted'])
+        wf = workflow.workflow_setup(feat_ext=True, images=[image2process],
+                                     rois=mask2process)
         workflow.runner(wf, cores=ARGS.num_cores)
 
     print('Done!')
