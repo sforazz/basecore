@@ -66,6 +66,31 @@ def check_rtstruct(basedir, regex):
     return list(set(data))
 
 
+def check_data(basedir, data_to_find, masks=[]):
+
+    data = []
+    for root, _, files in os.walk(basedir):
+        for name in files:
+            if data_to_find in name and name.endswith('.nii.gz'):
+                sub_name = root.split('/')[-2]
+                if masks:
+                    check = []
+                    for mask in masks:
+                        if os.path.isfile(os.path.join(root, mask+'.nii.gz')):
+                            check.append(1)
+                        else:
+                            check.append(0)
+                    if len(set(check)) == 1 and list(set(check))[0]==1:
+                        match = True
+                    else:
+                        match = False
+                else:
+                    match = True
+                if match:
+                    data.append(sub_name)
+    return list(set(data))
+
+
 def check_rts(rts, regex):
 
     ds = pd.read_file(rts)

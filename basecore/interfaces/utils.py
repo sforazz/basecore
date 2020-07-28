@@ -807,7 +807,7 @@ class FolderMerge(BaseInterface):
         for directories in input_list:
             mr_dir = directories[0]
             rt_dir = directories[1]
-            if not os.path.isdir(mr_dir):
+            if mr_dir is None or not os.path.isdir(mr_dir):
                 iflogger.info('No MRI data found')
                 mr_tocopy = []
                 mr_sub_name = None

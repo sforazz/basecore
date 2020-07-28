@@ -72,8 +72,9 @@ class RTDataSorting(BaseInterface):
                 os.path.join(tp_folder, 'RTPLAN'), os.path.join(out_basedir, 'RTPLAN'))
             if plan_name is None:
                 out_basedir = os.path.join(out_dir, sub_name, 'CT_'+tp)
-                if not os.path.isdir(out_basedir):
-                    shutil.copytree(tp_folder, out_basedir)
+                if not os.path.isdir(out_basedir+'/CT'):
+                    if os.path.isdir(tp_folder+'/CT'):
+                        shutil.copytree(tp_folder+'/CT', out_basedir+'/CT')
                 continue
             if rtstruct_instance is not None:
                 ct_classInstance = self.extract_struct(os.path.join(tp_folder, 'RTSTRUCT'),
@@ -292,7 +293,8 @@ class RTDataSorting(BaseInterface):
                         dose_rbe_found = True
                     if dose_rbe_found:
                         rbe_dir = os.path.join(out_dir, rbe_name)
-                        os.makedirs(rbe_dir)
+                        if not os.path.isdir(rbe_dir):
+                            os.makedirs(rbe_dir)
                         shutil.copy2(f, rbe_dir)
                     else:
                         print('dose_RBE_Cube was not found.')
@@ -305,7 +307,8 @@ class RTDataSorting(BaseInterface):
                         dose_physical_found=True
                     if dose_physical_found:
                         phy_dir = os.path.join(out_dir, phy_name)
-                        os.makedirs(phy_dir)
+                        if not os.path.isdir(phy_dir):
+                            os.makedirs(phy_dir)
                         shutil.copy2(f, phy_dir)
                     else:
                         print('dose_Physical_Cube was not found.')
@@ -354,11 +357,11 @@ class MRClass(BaseInterface):
         th = {'ADC':2,'DIFF':2,'T1':2,'T2':2,'FLAIR':2,'ADC':2,'SWI':2}
 #         device = "cpu"
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+   
         labeled, labeled_images = defaultdict(list), defaultdict(list)
-        modalities = ['DIFF','T2','T1']
+        modalities = ['DIFF','T2','T1', 'FLAIR', 'SWI']
         sub_modalities = ['T1','ADC']
-
+   
         data_transforms = transforms.Compose(
             [resize_2Dimage(256), ZscoreNormalization(), ToTensor()])
         for m in modalities:
@@ -368,32 +371,32 @@ class MRClass(BaseInterface):
                 transform=data_transforms)  
             test_dataloader = DataLoader(
                 test_dataset, batch_size=1, shuffle=False, num_workers=1)
-          
+             
             for _, data in enumerate(test_dataloader):
-              
+                 
                 inputs = data['image']
                 img_name = data['name']
-                  
+                     
                 inputs = inputs.to(device)
                 output = model(inputs)
                 prob = output.data.cpu().numpy()
                 actRange = abs(prob[0][0])+abs(prob[0][1])
                 index = output.data.cpu().numpy().argmax()
-                  
+                     
                 if index == 0 and actRange > th[m]:
                     labeled[img_name[0]].append([m,actRange])
-      
+         
         for key in labeled.keys():
             if len(labeled[key])>1:
                 if labeled[key][0][1]>labeled[key][1][1]:
                     del labeled[key][1]
                 else:
                     del labeled[key][0]
-          
-                      
+             
+                         
         for key in labeled.keys():
             labeled_images[labeled[key][0][0]].append([key,labeled[key][0][1]])
-              
+                 
         labeled_subImages, labeled_s = defaultdict(list), defaultdict(list)
         #labeled_images = defaultdict(list)
         for m in sub_modalities:
@@ -408,10 +411,10 @@ class MRClass(BaseInterface):
             test_dataloader = DataLoader(
                 test_dataset, batch_size = 1, shuffle=False, num_workers=8)
             for _, data in enumerate(test_dataloader):
-              
+                 
                 inputs = data['image']
                 img_name = data['name']
-                  
+                     
                 inputs = inputs.to(device)
                 output = model(inputs)
                 prob = output.data.cpu().numpy()
@@ -423,12 +426,12 @@ class MRClass(BaseInterface):
                     else:
                         labeled_s[img_name[0]].append([m+'KM',actRange])
                     continue
-                          
+                             
                 if index == 0:
                     labeled_s[img_name[0]].append([m,labeled[img_name[0]][0][1]])
                 else:
                     labeled_s[img_name[0]].append([m+'KM',labeled[img_name[0]][0][1]])
-                      
+                         
         for key in labeled_s.keys():
             if labeled_s[key][0][0] != 'ADCKM':
                 labeled_subImages[labeled_s[key][0][0]].append([key,labeled_s[key][0][1]])
@@ -436,17 +439,17 @@ class MRClass(BaseInterface):
             #if key =='DIFF' or key=='T1' or key=='T2':
             if key == 'T1' or key == 'DIFF':
                 del labeled_images[key]
-
+   
         self.labelled_images = {**labeled_subImages, **labeled_images}
 #         with open('/home/fsforazz/ww.pickle', 'wb') as f:
 #             pickle.dump(self.labelled_images, f, protocol=pickle.HIGHEST_PROTOCOL)
-#          
+          
 #         with open('/home/fsforazz/ww.pickle', 'rb') as handle:
 #             self.labelled_images = pickle.load(handle)
 
         to_remove = []
-        for key in self.labelled_images.keys():
-            labeled_list = [j[0][0:-7] for j in self.labelled_images[key]]
+#         for key in self.labelled_images.keys():
+#             labeled_list = [j[0][0:-7] for j in self.labelled_images[key]]
         for i in for_inference:
             image_dir = '/'.join(i.split('/')[:-1])
             to_remove = to_remove + [x for x in glob.glob(image_dir+'/*')
@@ -458,7 +461,7 @@ class MRClass(BaseInterface):
             if os.path.isfile(f):
                 os.remove(f)
 
-        self.unclassifiable = [x for x in for_inference if x[0:-7] not in labeled_list]
+#         self.unclassifiable = [x for x in for_inference if x[0:-7] not in labeled_list]
         for key in self.labelled_images.keys():
             for cm in self.labelled_images[key]:
                 indices = [i for i, x in enumerate(cm[0]) if x == "/"]

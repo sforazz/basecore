@@ -10,19 +10,20 @@ from basecore.interfaces.custom import RTDataSorting, MRClass
 from nipype.interfaces.utility import Merge
 
 
-checkpoints={'T1': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_T1vsAll_0994.pth",
-            'T2': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_T2vsAll_0995416.pth",
-            'FLAIR': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_FLAIRvsAll_0989177.pth",
-            'DIFF': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_ADCvsall_0997915_28052019.pth",
-            'SWI': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_SWIvsAll_0999454_06062019.pth"}
+checkpoints={'T1': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_T1vsAll_0994.pth",
+            'T2': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_T2vsAll_0995416.pth",
+            'FLAIR': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_FLAIRvsAll_0989177.pth",
+            'DIFF': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_ADCvsall_0997915_28052019.pth",
+            'SWI': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_SWIvsAll_0999454_06062019.pth"}
 
-sub_checkpoints={'T1': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_All_T1_T1KM_09650.pth",
-                 'ADC': "/home/fsforazz/git/mrclass/mr_class/checkpoints/checkpoint_ADCvsDiff0992329_27052019.pth"}
+sub_checkpoints={'T1': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_All_T1_T1KM_09650.pth",
+                 'ADC': "/media/fsforazz/Samsung_T5/mr_class/checkpoints/checkpoint_ADCvsDiff0992329_27052019.pth"}
 
 
 class DataCuration(BaseWorkflow):
     
-    def sorting_workflow(self, subject_name_position=-3, renaming=False):
+    def sorting_workflow(self, subject_name_position=-3, renaming=False,
+                         mr_classiffication=True):
 
         nipype_cache = os.path.join(self.nipype_cache, 'data_sorting')
         result_dir = self.result_dir
@@ -44,26 +45,32 @@ class DataCuration(BaseWorkflow):
                               iterfield=['input_list'])
         sort = nipype.MapNode(interface=FolderSorting(), name='sort',
                               iterfield=['input_dir'])
-        mrclass = nipype.MapNode(interface=MRClass(), name='mrclass',
-                                 iterfield=['mr_images'])
-        mrclass.inputs.checkpoints = checkpoints
-        mrclass.inputs.sub_checkpoints = sub_checkpoints
-        rt_sorting = nipype.MapNode(interface=RTDataSorting(), name='rt_sorting',
-                                    iterfield=['input_dir'])
         mr_rt_merge = nipype.MapNode(interface=Merge(2), name='mr_rt_merge',
                                     iterfield=['in1', 'in2'])
         mr_rt_merge.inputs.ravel_inputs = True
         merging = nipype.Node(interface=FolderMerge(), name='merge')
+        if mr_classiffication:
+            mrclass = nipype.MapNode(interface=MRClass(), name='mrclass',
+                                     iterfield=['mr_images'])
+            mrclass.inputs.checkpoints = checkpoints
+            mrclass.inputs.sub_checkpoints = sub_checkpoints
+        else:
+            mr_rt_merge.inputs.in1 = None
+        rt_sorting = nipype.MapNode(interface=RTDataSorting(), name='rt_sorting',
+                                    iterfield=['input_dir'])
 
 #         workflow.connect(create_list, 'file_list', file_check, 'input_file')
         workflow.connect(file_check, 'out_list', prep, 'input_list')
         workflow.connect(prep, 'out_folder', sort, 'input_dir')
         workflow.connect(sort, 'out_folder', rt_sorting, 'input_dir')
-        workflow.connect(sort, 'mr_images', mrclass, 'mr_images')
-        workflow.connect(mrclass, 'out_folder', mr_rt_merge, 'in1')
+        if mr_classiffication:
+            workflow.connect(sort, 'mr_images', mrclass, 'mr_images')
+            workflow.connect(mrclass, 'out_folder', mr_rt_merge, 'in1')
+
         workflow.connect(rt_sorting, 'out_folder', mr_rt_merge, 'in2')
         workflow.connect(mr_rt_merge, 'out', merging, 'input_list')
         workflow.connect(merging, 'out_folder', datasink, '@rt_sorted')
+#         workflow.connect(rt_sorting, 'out_folder', datasink, '@rt_sorted')
         
         return workflow
 
@@ -213,12 +220,12 @@ class DataCuration(BaseWorkflow):
         return workflow
 
     def workflow_setup(self, data_sorting=False, subject_name_position=-3,
-                       renaming=False):
+                       renaming=False, mr_classiffication=True):
 
         if data_sorting:
             workflow = self.sorting_workflow(
                 subject_name_position=subject_name_position,
-                renaming=renaming)
+                renaming=renaming, mr_classiffication=mr_classiffication)
 #             sorting_workflow.run()
         else:
             workflow = self.convertion_workflow()

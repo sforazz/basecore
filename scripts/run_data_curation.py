@@ -15,6 +15,12 @@ if __name__ == "__main__":
     PARSER.add_argument('--data_sorting', '-ds', action='store_true',
                         help=('Whether or not to sort the data before convertion. '
                               'Default is False'))
+    PARSER.add_argument('--no-data_curation', '-ndc', action='store_true',
+                        help=('Whether or not to run data curation after sorting. '
+                              'By default it will run.'))
+    PARSER.add_argument('--no-mrclass', '-nmc', action='store_true',
+                        help=('Whether or not to classify MR images using MRClass. '
+                              'By default it will run.'))
     PARSER.add_argument('--renaming', action='store_true', 
                         help='Whether or not to use the information stored'
                            'in the DICOM header to rename the subject and sessions '
@@ -45,23 +51,24 @@ if __name__ == "__main__":
             process_rt=True)
         wf = workflow.workflow_setup(
             data_sorting=True, subject_name_position=ARGS.subject_name_position,
-            renaming=ARGS.renaming)
+            renaming=ARGS.renaming, mr_classiffication=not ARGS.no_mrclass)
         workflow.runner(wf, cores=ARGS.num_cores)
         BASE_DIR = os.path.join(ARGS.work_dir, 'workflows_output', 'Sorted_Data')
         sub_list = os.listdir(BASE_DIR)
 
-    for sub_id in sub_list:
-
-        print('Processing subject {}'.format(sub_id))
-
-        workflow = DataCuration(
-            sub_id=sub_id, input_dir=BASE_DIR, work_dir=ARGS.work_dir,
-            xnat_source=ARGS.xnat_source, xnat_project_id=ARGS.xnat_project_id,
-            xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
-            xnat_processed_session=ARGS.xnat_processed_session, process_rt=True,
-            cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
-            cluster_project_id=ARGS.cluster_project_id)
-        wf = workflow.workflow_setup()
-        workflow.runner(wf, cores=ARGS.num_cores)
+    if not ARGS.no_data_curation:
+        for sub_id in sub_list:
+    
+            print('Processing subject {}'.format(sub_id))
+    
+            workflow = DataCuration(
+                sub_id=sub_id, input_dir=BASE_DIR, work_dir=ARGS.work_dir,
+                xnat_source=ARGS.xnat_source, xnat_project_id=ARGS.xnat_project_id,
+                xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
+                xnat_processed_session=ARGS.xnat_processed_session, process_rt=True,
+                cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
+                cluster_project_id=ARGS.cluster_project_id)
+            wf = workflow.workflow_setup()
+            workflow.runner(wf, cores=ARGS.num_cores)
 
     print('Done!')

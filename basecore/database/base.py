@@ -55,6 +55,7 @@ class BaseDatabase():
 
         sessions = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                     if 'REF' not in x and 'T10' not in x and 'RT_' not in x
+                    and 'CT_' not in x
                     and os.path.isdir(os.path.join(base_dir, sub_id, x))]
         ref_session = [x for x in os.listdir(os.path.join(base_dir, sub_id))
                        if x == 'REF' and os.path.isdir(os.path.join(base_dir, sub_id, x))]
@@ -94,7 +95,8 @@ class BaseDatabase():
                             'in order to perform registration.'.format(sub_id))
         self.add_subfolder = False
         if ext == '' and sessions:
-            dcms = [y for x in sessions for y in glob.glob(os.path.join(base_dir, sub_id, x, '*/*.dcm'))]
+            dcms = [y for x in sessions for y in glob.glob(os.path.join(base_dir, sub_id, x, '*/*.dcm'))
+                    if 'CT_' not in y]
             if not dcms:
                 dcms = [y for x in sessions for y in glob.glob(
                     os.path.join(base_dir, sub_id, x, '*/1-*', '*.dcm'))]

@@ -163,7 +163,7 @@ def file_rename(image):
     return new_name
 
 
-def create_move_toDir(fileName, dirName,actRange):
+def create_move_toDir(fileName, dirName, actRange):
     
     folderName=Path(fileName[0:-7])
     indices = [i for i, x in enumerate(folderName.parts[-1]) if x == "-"]
@@ -172,17 +172,29 @@ def create_move_toDir(fileName, dirName,actRange):
     if not os.path.exists(dirName) and not os.path.isdir(dirName):
         os.makedirs(dirName)
         print(folderName)
-        newName=os.path.join(dirName[0:indices2[-1]],
-                             '1-'+ folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+        print(indices)
+        try:
+            newName = os.path.join(dirName[0:indices2[-1]],
+                                   '1-'+ folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+        except IndexError:
+            newName = os.path.join(dirName[0:indices2[-1]],
+                                   '1-'+ folderName.parts[-1]+'-'+str(actRange))
        
     else:
-        f=[ item for item in os.listdir(dirName) if '1-' in item ]
-        indices3= [i for i, x in enumerate(f[0]) if x == "-"]
+        f = [item for item in os.listdir(dirName) if '1-' in item]
+        if len(f) > 1:
+            [f.remove(x) for x in f if len(x.split('-')) != 3]
+        indices3 = [i for i, x in enumerate(f[0]) if x == "-"]
         actRange_f=float(f[0][indices3[-1]+1:])
+#         actRange_f = sorted([float(x[indices3[-1]+1:]) for x in f])[0]
 
         if actRange>actRange_f:
-            newName=os.path.join(dirName[0:indices2[-1]],
-                                 '1-'+ folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+            try:
+                newName=os.path.join(dirName[0:indices2[-1]],
+                                     '1-'+ folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+            except:
+                newName=os.path.join(dirName[0:indices2[-1]],
+                                     '1-'+ folderName.parts[-1]+'-'+str(actRange))
             if not os.path.isdir(os.path.join(dirName,f[0][indices3[0]+1:])):
                 shutil.move(os.path.join(dirName,f[0]),
                             os.path.join(dirName,f[0][indices3[0]+1:]))
@@ -191,8 +203,12 @@ def create_move_toDir(fileName, dirName,actRange):
                             os.path.join(dirName,f[0][indices3[0]+1:]+'_1'))
           
         elif actRange <= actRange_f:
-            newName=os.path.join(dirName[0:indices2[-1]],
-                                 folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+            try:
+                newName=os.path.join(dirName[0:indices2[-1]],
+                                     folderName.parts[-1][0:indices[0]]+'-'+str(actRange))
+            except IndexError:
+                newName=os.path.join(dirName[0:indices2[-1]],
+                                     folderName.parts[-1]+'-'+str(actRange))
 #     shutil.move(fileName[0:-7],newName)
     shutil.copytree(fileName[0:-7], newName)
     try:
