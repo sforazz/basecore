@@ -25,7 +25,12 @@ setup(name='basecore',
       'six==1.12.0',
       'nipype==1.2.0',
       'xnat==0.3.21',
-      'pyxnat==1.2.1.0.post3'
+      'pyxnat==1.2.1.0.post3',
+      'PySimpleGUI==4.26.0',
+      'torch==1.4.0',
+      'torchvision==0.5.0',
+      'scikit-image==0.16.2',
+      'opencv-python==4.2.0.34'
       ],
       packages=find_packages(exclude=['*.tests', '*.tests.*', 'tests.*', 'tests']),
       classifiers=[
