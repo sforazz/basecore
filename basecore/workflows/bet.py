@@ -3,6 +3,7 @@ import nipype
 from basecore.interfaces.mic import HDBet
 from nipype.interfaces.fsl.utils import Reorient2Std
 from basecore.workflows.base import BaseWorkflow
+from nipype.interfaces.ants import N4BiasFieldCorrection
 
 
 class BETWorkflow(BaseWorkflow):
@@ -26,6 +27,8 @@ class BETWorkflow(BaseWorkflow):
         
         reorient = nipype.MapNode(interface=Reorient2Std(), iterfield=['in_file'],
                                   name='reorient')
+        n4 = nipype.MapNode(interface=N4BiasFieldCorrection(), iterfield=['input_image'],
+                                  name='n4')
     
         if t10:
             bet_t10 = nipype.Node(interface=HDBet(), name='t1_0_bet')
@@ -33,6 +36,8 @@ class BETWorkflow(BaseWorkflow):
             bet_t10.inputs.out_file = 'T1_0_bet'
             reorient_t10 = nipype.Node(interface=Reorient2Std(), iterfield=['in_file'],
                                   name='reorient_t10')
+            n4_t10 = nipype.MapNode(interface=N4BiasFieldCorrection(),
+                                    iterfield=['input_image'], name='n4_t10')
     
         datasink = nipype.Node(nipype.DataSink(base_directory=result_dir), "datasink")
     
@@ -47,10 +52,12 @@ class BETWorkflow(BaseWorkflow):
         workflow = nipype.Workflow('brain_extraction_workflow', base_dir=nipype_cache)
     
         workflow.connect(datasource, ref_sequence, reorient, 'in_file')
-        workflow.connect(reorient, 'out_file', bet, 'input_file')
+        workflow.connect(reorient, 'out_file', n4, 'input_image')
+        workflow.connect(n4, 'output_image', bet, 'input_file')
         if t10:
             workflow.connect(datasource, 't1_0', reorient_t10, 'in_file')
-            workflow.connect(reorient_t10, 'out_file', bet_t10, 'input_file')
+            workflow.connect(reorient_t10, 'out_file', n4_t10, 'input_image')
+            workflow.connect(n4_t10, 'output_image', bet_t10, 'input_file')
             workflow.connect(bet_t10, 'out_file', datasink,
                              'results.subid.T10.@T1_ref_bet')
             workflow.connect(bet_t10, 'out_mask', datasink,
