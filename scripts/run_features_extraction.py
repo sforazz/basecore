@@ -32,7 +32,7 @@ if __name__ == "__main__":
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
             cluster_project_id=ARGS.cluster_project_id)
 
-        wf = workflow.workflow_setup(ct_feat_ext=True)
+        wf = workflow.workflow_setup(ct_feat_ext=False)
         workflow.runner(wf, cores=ARGS.num_cores)
 
     print('Done!')

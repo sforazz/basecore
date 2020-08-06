@@ -123,6 +123,7 @@ class BaseDatabase():
             rt['physical'] = []
             rt['rbe'] = []
             rt['doses'] = []
+            rt['doses_nii'] = []
             rt['rtstruct'] = []
             rt['rtct'] = []
             rt['session'] = []
@@ -166,9 +167,15 @@ class BaseDatabase():
                     rt['physical'] = rt['physical']+physical
                     rt['rbe'] = rt['rbe'] + rbe
                     rt['doses'] = rt['doses'] + doses
+                elif os.path.isfile(os.path.join(base_dir, sub_id, rt_session, 'RTDOSE.nii.gz')):
+                    rt['doses_nii'] = rt['doses_nii'] + [os.path.join(base_dir, sub_id, rt_session, 'RTDOSE.nii.gz')]
                 if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTSTRUCT')):
                     rtstruct = [x for x in os.listdir(os.path.join(
                         base_dir, sub_id, rt_session, 'RTSTRUCT')) if '1-' in x]
+                    rt['rtstruct'] = rt['rtstruct'] + rtstruct
+                elif os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTSTRUCT_used')):
+                    rtstruct = [x for x in os.listdir(os.path.join(
+                        base_dir, sub_id, rt_session, 'RTSTRUCT_used'))]
                     rt['rtstruct'] = rt['rtstruct'] + rtstruct
                 if os.path.isdir(os.path.join(base_dir, sub_id, rt_session, 'RTCT')):
                     rtct = [x for x in os.listdir(os.path.join(

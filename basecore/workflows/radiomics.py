@@ -10,7 +10,7 @@ from nipype.interfaces.utility import Merge
 
 class RadiomicsWorkflow(BaseWorkflow):
 
-    def __init__(self, regex=None, roi_selection=False, **kwargs):
+    def __init__(self, regex='(.*GTV.*|.*gtv.*)|(.*CTV.*|.*ctv.*)|(.*PTV.*|.*ptv.*)', roi_selection=True, **kwargs):
         
         super().__init__(**kwargs)
         self.regex = regex
@@ -28,6 +28,8 @@ class RadiomicsWorkflow(BaseWorkflow):
                 rt_dose = '*RBE*.nii.gz'
             elif rt['doses']:
                 rt_dose = 'Unused_RTDOSE.nii.gz'
+            elif rt['doses_nii']:
+                rt_dose = 'RTDOSE.nii.gz'
             else:
                 if self.roi_selection:
                     self.roi_selection = False
