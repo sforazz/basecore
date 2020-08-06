@@ -10,7 +10,7 @@ from nipype.interfaces.utility import Merge
 
 class RadiomicsWorkflow(BaseWorkflow):
 
-    def __init__(self, regex='(.*GTV.*|.*gtv.*)|(.*CTV.*|.*ctv.*)|(.*PTV.*|.*ptv.*)', roi_selection=True, **kwargs):
+    def __init__(self, regex=None, roi_selection=True, **kwargs):
         
         super().__init__(**kwargs)
         self.regex = regex
@@ -173,7 +173,7 @@ class RadiomicsWorkflow(BaseWorkflow):
         substitutions += [('_features_extraction0/', 'REF/')]
         datasink.inputs.substitutions =substitutions
     
-        workflow.connect(datasource, 'reference', features, 'input_image')
+        workflow.connect(datasource, 'rtct_nifti', features, 'input_image')
         if base_workflow is not None:
             workflow.connect(base_workflow, rois, features, 'rois')
         else:
