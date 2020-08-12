@@ -6,6 +6,7 @@ from basecore.utils.utils import check_dcm_dose
 from basecore.database.pyxnat import PyxnatDatabase
 from basecore.database.utils import check_cache
 from basecore.database.cluster import ClusterDatabase
+from basecore.database.local import LocalDatabase
 
 
 POSSIBLE_SEQUENCES = ['t1', 'ct1', 't1km', 't2', 'flair', 'adc', 'swi']
@@ -18,7 +19,9 @@ class BaseDatabase():
                  xnat_config=None, xnat_overwrite=False,
                  xnat_processed_session=True, xnat_sink=False,
                  cluster_source=False, cluster_sink=False,
-                 cluster_project_id=None):
+                 cluster_project_id=None, local_source=False,
+                 local_sink=False, local_project_id=None,
+                 local_basedir=''):
 
         self.sub_id = sub_id
         self.base_dir = input_dir
@@ -34,6 +37,8 @@ class BaseDatabase():
         self.input_needed = []
         self.cluster_sink = cluster_sink
         self.cluster_source = cluster_source
+        self.local_sink = local_sink
+        self.local_source = local_source
         self.workflow_name = self.__class__.__name__
         self.outdir = os.path.join(self.result_dir, self.workflow_name)
         if xnat_source or xnat_sink:
@@ -46,6 +51,10 @@ class BaseDatabase():
                 config_file=None, cluster_host_name='e132-comp01', 
                 project_id=cluster_project_id, 
                 cluster_basedir='/datasets/datasets_E210')
+        elif local_source or local_sink:
+            self.local = LocalDatabase(
+                project_id=local_project_id, 
+                local_basedir=local_basedir)
     
     def database(self):
         
@@ -81,6 +90,12 @@ class BaseDatabase():
         else:
             ext = ''
         sequences = [x for x in sequences if x in POSSIBLE_SEQUENCES]
+        self.session_names = {}
+        for seq in sequences:
+            sess = [x for x in sessions
+                    for y in sorted(os.listdir(os.path.join(base_dir, sub_id, x)))
+                    if y.lower() == seq]
+            self.session_names[seq] = sess
 #         sequences = list(set([x for y in POSSIBLE_SEQUENCES for x in sequences if y in x]))
         if 'ct1' in sequences:
             ref_sequence = 'ct1'
@@ -387,3 +402,24 @@ class BaseDatabase():
                     if os.path.isdir(os.path.join(sub_folder, x))]
         
         self.cluster.put(sessions, sub_folder)
+
+    def local_datasource(self):
+        
+        skip_sessions = check_cache(self.sessions, self.input_needed,
+                                    self.sub_id, self.base_dir)
+        
+        if [x for x in self.sessions if x not in skip_sessions]:
+            self.local.get(self.base_dir, subjects=[self.sub_id],
+                             needed_scans=self.input_needed,
+                             skip_sessions=skip_sessions)
+
+    def local_datasink(self):
+
+        sub_folder = os.path.join(self.outdir, self.sub_id)
+        if os.path.isdir(sub_folder):
+            sessions = [x for x in sorted(os.listdir(sub_folder))
+                        if os.path.isdir(os.path.join(sub_folder, x))]
+            
+            self.local.put(sessions, sub_folder)
+        else:
+            print('Nothing to copy for subject {}'.format(self.sub_id))

@@ -13,6 +13,8 @@ class BaseWorkflow(BaseDatabase):
                 self.xnat_datasource()
             elif self.cluster_source:
                 self.cluster_datasource()
+            elif self.local_source:
+                self.local_source()
 
         self.data_source = self.create_datasource()
 
@@ -35,4 +37,6 @@ class BaseWorkflow(BaseDatabase):
             self.cluster_datasink()
         if self.xnat_sink:
             self.xnat_datasink()
+        if self.local_sink:
+            self.local_datasink()
     

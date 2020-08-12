@@ -147,7 +147,7 @@ class DataCuration(BaseWorkflow):
                 else:
                     workflow.connect(check, 'out_file', datasink,
                                      'results.subid.@{}_converted'.format(seq))
-                    for i, session in enumerate(sessions):
+                    for i, session in enumerate(self.session_names[seq]):
                         substitutions += [(('_converter{0}{1}/'.format(seq, i), session+'/'))]
             else:
                 if seq != 'rtstruct':
