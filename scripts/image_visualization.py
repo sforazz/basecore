@@ -13,7 +13,7 @@ import glob
 
 
 
-root_dir=r'/media/fsforazz/Samsung_T5/chordoma_TP0/'
+root_dir=r'/home/fsforazz/Desktop/features_extraction/database_cache/'
 
 
 def extract_middleSlice(image):
@@ -43,7 +43,7 @@ def smallest(num1, num2, num3):
 
 
 
-list_sub = glob.glob(root_dir+'/*/*/FLAIR.nii.gz')
+list_sub = glob.glob(root_dir+'/*/*/T1KM.nii.gz')
 z=0
 cnt=0
 

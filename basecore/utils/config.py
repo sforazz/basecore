@@ -38,6 +38,17 @@ def cmdline_input_config():
     PARSER.add_argument('--cluster-project-id', '-cpid', type=str,
                         help=('Cluster project ID. If not provided, and cluster-source and/or '
                               'cluster-sink were selected, you will be prompted to enter it.'))
+    PARSER.add_argument('--local-sink', '-ls', action='store_true',
+                        help=('Whether or not to store the processed files in a local database. '
+                              'Default is False'))
+    PARSER.add_argument('--local-source', action='store_true',
+                        help=('Whether or not to source data from a local database. '
+                              'Default is False'))
+    PARSER.add_argument('--local-project-id', '-lpid', type=str,
+                        help=('Local project ID. If not provided, and local-source and/or '
+                              'local-sink were selected, you will be prompted to enter it.'))
+    PARSER.add_argument('--local-dir', '-ldir', type=str,
+                        help=('Directory to store the local database.'))
     
     return PARSER
 

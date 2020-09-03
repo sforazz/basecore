@@ -6,6 +6,10 @@ from nipype.interfaces.utility import Merge
 from nipype.interfaces.fsl.utils import Reorient2Std
 from basecore.interfaces.ants import AntsRegSyn
 from basecore.workflows.base import BaseWorkflow
+from nipype.interfaces.ants import N4BiasFieldCorrection
+
+
+SEQ_N4_CORRECTION = ['t1', 'ct1', 't1km', 't2', 'swi']
 
 
 class RegistrationWorkflow(BaseWorkflow):
@@ -95,8 +99,19 @@ class RegistrationWorkflow(BaseWorkflow):
         apply_ts_nodes1 = {}
         merge_nodes = {}
         merge_nodes1 = {}
-    
+        n4_nodes = {}
+
+        n4_ref = nipype.MapNode(interface=N4BiasFieldCorrection(),
+                                iterfield=['input_image'],
+                                name='n4_ref')
+
         for seq in sequences:
+            if seq in SEQ_N4_CORRECTION:
+                n4 = nipype.MapNode(
+                    interface=N4BiasFieldCorrection(), iterfield=['input_image'],
+                    name='n4{}'.format(seq))
+                n4_nodes[seq] = n4
+
             reg = nipype.MapNode(interface=AntsRegSyn(), iterfield=['input_file', 'ref_file'],
                                  name='ants_reg{}'.format(seq))
             reg.inputs.transformation = 'r'
@@ -210,8 +225,15 @@ class RegistrationWorkflow(BaseWorkflow):
             workflow.connect(datasource, seq, reorient_nodes[seq], 'in_file')
     
         for seq in sequences:
-            workflow.connect(reorient_nodes[seq], 'out_file', reg_nodes[seq], 'input_file')
-            workflow.connect(reorient_nodes[ref_sequence], 'out_file', reg_nodes[seq], 'ref_file')
+#             workflow.connect(reorient_nodes[ref_sequence], 'out_file', reg_nodes[seq], 'ref_file')
+            workflow.connect(reorient_nodes[ref_sequence], 'out_file', n4_ref, 'input_image')
+            workflow.connect(n4_ref, 'output_image', reg_nodes[seq], 'ref_file')
+            if seq in SEQ_N4_CORRECTION:
+                workflow.connect(reorient_nodes[seq], 'out_file', n4_nodes[seq],
+                                 'input_image')
+                workflow.connect(n4_nodes[seq], 'output_image', reg_nodes[seq], 'input_file')
+            else:
+                workflow.connect(reorient_nodes[seq], 'out_file', reg_nodes[seq], 'input_file')
             
             if reference:
                 if t10:

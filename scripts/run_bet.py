@@ -25,7 +25,10 @@ if __name__ == "__main__":
             xnat_overwrite=ARGS.xnat_overwrite, xnat_sink=ARGS.xnat_sink,
             xnat_processed_session=ARGS.xnat_processed_session,
             cluster_sink=ARGS.cluster_sink, cluster_source=ARGS.cluster_source,
-            cluster_project_id=ARGS.cluster_project_id)
+            cluster_project_id=ARGS.cluster_project_id,
+            local_source=ARGS.local_source, local_sink=ARGS.local_sink,
+            local_project_id=ARGS.local_project_id,
+            local_basedir=ARGS.local_dir)
 
         wf = workflow.workflow_setup()
         workflow.runner(wf)
